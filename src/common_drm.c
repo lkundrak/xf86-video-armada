@@ -1443,6 +1443,13 @@ _X_EXPORT
 int common_drm_get_drawable_msc(xf86CrtcPtr crtc, DrawablePtr pDraw,
 	uint64_t *ust, uint64_t *msc)
 {
+	/* Drawable not displayed, make up a value */
+	if (!crtc) {
+		*ust = 0;
+		*msc = 0;
+		return Success;
+	}
+
 	return common_drm_get_msc(crtc, ust, msc);
 }
 

@@ -271,13 +271,6 @@ int common_dri2_GetMSC(DrawablePtr draw, CARD64 *ust, CARD64 *msc)
 {
 	xf86CrtcPtr crtc = common_drm_drawable_covering_crtc(draw);
 
-	/* Drawable not displayed, make up a value */
-	if (!crtc) {
-		*ust = 0;
-		*msc = 0;
-		return TRUE;
-	}
-
 	return common_drm_get_drawable_msc(crtc, draw, ust, msc) == Success;
 }
 
