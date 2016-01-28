@@ -119,13 +119,20 @@ static uint64_t common_drm_frame_to_msc(xf86CrtcPtr crtc, uint32_t seq)
 {
 	struct common_crtc_info *drmc = common_crtc(crtc);
 
-	if (seq < drmc->last_seq) {
-		if ((int32_t)(drmc->last_seq - seq) > 0x40000000)
-			drmc->last_msc += 0x100000000ULL;
-		else
-			seq = drmc->last_seq;
-	}
+	/*
+	 * The sequence counter wrapped.  Unlike the misleading comments in
+	 * xf86-video-intel, the vblank counter is never wound backwards: it
+	 * always runs forwards.  However, since we don't monitor it with
+	 * any regularity, it can appear to go backwards if we wait (eg)
+	 * 0xc0000000 vblanks between calls.  Hence, whenever we see the
+	 * frame sequence less than the last sequence, assume that it has
+	 * wrapped.  (It may have wrapped more than once.)
+	 */
+	if (seq < drmc->last_seq)
+		drmc->last_msc += 0x100000000ULL;
+
 	drmc->last_seq = seq;
+
 	return drmc->last_msc + seq;
 }
 
