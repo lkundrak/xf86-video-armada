@@ -18,6 +18,7 @@
 #include "xf86.h"
 
 #include "boxutil.h"
+#include "pixmaputil.h"
 
 #include "common_drm.h"
 #include "common_drm_helper.h"
@@ -69,6 +70,10 @@ static DevPrivateKeyRec pixmap_key;
 struct common_pixmap {
 	uint32_t handle;
 	void *data;
+	xf86CrtcPtr crtc;
+	uint64_t last_ust;
+	uint64_t last_msc;
+	int64_t delta_msc;
 };
 
 static struct common_pixmap *common_drm_pixmap(PixmapPtr pixmap)
@@ -1443,14 +1448,45 @@ _X_EXPORT
 int common_drm_get_drawable_msc(xf86CrtcPtr crtc, DrawablePtr pDraw,
 	uint64_t *ust, uint64_t *msc)
 {
-	/* Drawable not displayed, make up a value */
-	if (!crtc) {
-		*ust = 0;
-		*msc = 0;
+	struct common_pixmap *drawc;
+	int ret = Success;
+
+	if (!pDraw && !crtc) {
+		*ust = *msc = 0;
 		return Success;
 	}
 
-	return common_drm_get_msc(crtc, ust, msc);
+	if (!pDraw)
+		return common_drm_get_msc(crtc, ust, msc);
+
+	drawc = common_drm_pixmap(drawable_pixmap(pDraw));
+
+	if (drawc->crtc) {
+		uint64_t old_ust, old_msc;
+
+		ret = common_drm_get_msc(drawc->crtc, &old_ust, &old_msc);
+		if (ret == Success) {
+			drawc->last_ust = old_ust;
+			drawc->last_msc = old_msc + drawc->delta_msc;
+		}
+	}
+
+	if (drawc->crtc != crtc) {
+		uint64_t new_ust, new_msc;
+
+		drawc->crtc = crtc;
+
+		if (crtc) {
+			ret = common_drm_get_msc(crtc, &new_ust, &new_msc);
+			if (ret == Success)
+				drawc->delta_msc = drawc->last_msc - new_msc;
+		}
+	}
+
+	*ust = drawc->last_ust;
+	*msc = drawc->last_msc;
+
+	return ret;
 }
 
 _X_EXPORT
@@ -1483,11 +1519,30 @@ int common_drm_queue_msc_event(ScrnInfoPtr pScrn, xf86CrtcPtr crtc,
 
 _X_EXPORT
 int common_drm_queue_drawable_msc_event(ScrnInfoPtr pScrn, xf86CrtcPtr crtc,
-	DrawablePtr pDraw, uint64_t *msc, const char *func, Bool nextonmiss,
+	DrawablePtr pDraw, uint64_t *pmsc, const char *func, Bool nextonmiss,
 	struct common_drm_event *event)
 {
-	return common_drm_queue_msc_event(pScrn, crtc, msc, func, nextonmiss,
-					  event);
+	struct common_pixmap *drawc;
+	uint64_t msc = *pmsc;
+	int64_t delta = 0;
+	int ret;
+
+	/*
+	 * If we have a drawable, we need to correct the MSC for the
+	 * drawable delta.
+	 */
+	if (pDraw) {
+		drawc = common_drm_pixmap(drawable_pixmap(pDraw));
+		delta = drawc->delta_msc;
+		msc -= delta;
+	}
+
+	ret = common_drm_queue_msc_event(pScrn, crtc, &msc, func, nextonmiss,
+					 event);
+
+	*pmsc = msc + delta;
+
+	return ret;
 }
 
 _X_EXPORT
