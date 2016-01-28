@@ -278,7 +278,7 @@ int common_dri2_GetMSC(DrawablePtr draw, CARD64 *ust, CARD64 *msc)
 		return TRUE;
 	}
 
-	return common_drm_get_msc(crtc, ust, msc) == Success;
+	return common_drm_get_drawable_msc(crtc, draw, ust, msc) == Success;
 }
 
 static void common_dri2_waitmsc(struct common_dri2_wait *wait,
@@ -310,7 +310,8 @@ Bool common_dri2_ScheduleWaitMSC(ClientPtr client, DrawablePtr draw,
 	wait->event_func = common_dri2_waitmsc;
 
 	/* Get current count */
-	if (common_drm_get_msc(crtc, &cur_ust, &cur_msc) != Success)
+	if (common_drm_get_drawable_msc(crtc, draw, &cur_ust, &cur_msc) !=
+	    Success)
 		goto del_wait;
 
 	/*
@@ -338,8 +339,9 @@ Bool common_dri2_ScheduleWaitMSC(ClientPtr client, DrawablePtr draw,
 			target_msc += divisor;
 	}
 
-	ret = common_drm_queue_msc_event(pScrn, crtc, &target_msc, __FUNCTION__,
-					 FALSE, &wait->base);
+	ret = common_drm_queue_drawable_msc_event(pScrn, crtc, draw,
+						  &target_msc, __FUNCTION__,
+						  FALSE, &wait->base);
 	if (ret)
 		goto del_wait;
 

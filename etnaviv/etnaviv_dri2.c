@@ -225,7 +225,8 @@ static int etnaviv_dri2_ScheduleSwap(ClientPtr client, DrawablePtr draw,
 	common_dri2_buffer_reference(front);
 	common_dri2_buffer_reference(back);
 
-	if (common_drm_get_msc(crtc, &cur_ust, &cur_msc) != Success)
+	if (common_drm_get_drawable_msc(crtc, draw, &cur_ust, &cur_msc) !=
+	    Success)
 		goto blit_free;
 
 	/* Flips need to be submitted one frame before */
@@ -285,9 +286,10 @@ static int etnaviv_dri2_ScheduleSwap(ClientPtr client, DrawablePtr draw,
 			tgt_msc -= 1;
 	}
 
-	ret = common_drm_queue_msc_event(pScrn, crtc, &tgt_msc, __FUNCTION__,
-					    wait->type != DRI2_FLIP,
-					    &wait->base);
+	ret = common_drm_queue_drawable_msc_event(pScrn, crtc, draw, &tgt_msc,
+						  __FUNCTION__,
+						  wait->type != DRI2_FLIP,
+						  &wait->base);
 	if (ret)
 		goto blit_free;
 

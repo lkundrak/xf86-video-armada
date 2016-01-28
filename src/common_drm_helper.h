@@ -14,9 +14,14 @@ int common_drm_vblank_get(ScrnInfoPtr pScrn, xf86CrtcPtr crtc,
 	drmVBlank *vbl, const char *func);
 
 int common_drm_get_msc(xf86CrtcPtr crtc, uint64_t *ust, uint64_t *msc);
+int common_drm_get_drawable_msc(xf86CrtcPtr crtc, DrawablePtr pDraw,
+	uint64_t *ust, uint64_t *msc);
 
 int common_drm_queue_msc_event(ScrnInfoPtr pScrn, xf86CrtcPtr crtc,
 	uint64_t *msc, const char *func, Bool nextonmiss,
+	struct common_drm_event *event);
+int common_drm_queue_drawable_msc_event(ScrnInfoPtr pScrn, xf86CrtcPtr crtc,
+	DrawablePtr pDraw, uint64_t *msc, const char *func, Bool nextonmiss,
 	struct common_drm_event *event);
 
 int common_drm_vblank_wait(ScrnInfoPtr pScrn, xf86CrtcPtr crtc,

@@ -1440,6 +1440,13 @@ int common_drm_get_msc(xf86CrtcPtr crtc, uint64_t *ust, uint64_t *msc)
 }
 
 _X_EXPORT
+int common_drm_get_drawable_msc(xf86CrtcPtr crtc, DrawablePtr pDraw,
+	uint64_t *ust, uint64_t *msc)
+{
+	return common_drm_get_msc(crtc, ust, msc);
+}
+
+_X_EXPORT
 int common_drm_queue_msc_event(ScrnInfoPtr pScrn, xf86CrtcPtr crtc,
 	uint64_t *msc, const char *func, Bool nextonmiss,
 	struct common_drm_event *event)
@@ -1465,6 +1472,15 @@ int common_drm_queue_msc_event(ScrnInfoPtr pScrn, xf86CrtcPtr crtc,
 		*msc = common_drm_frame_to_msc(crtc, vbl.reply.sequence);
 
 	return ret;
+}
+
+_X_EXPORT
+int common_drm_queue_drawable_msc_event(ScrnInfoPtr pScrn, xf86CrtcPtr crtc,
+	DrawablePtr pDraw, uint64_t *msc, const char *func, Bool nextonmiss,
+	struct common_drm_event *event)
+{
+	return common_drm_queue_msc_event(pScrn, crtc, msc, func, nextonmiss,
+					  event);
 }
 
 _X_EXPORT
