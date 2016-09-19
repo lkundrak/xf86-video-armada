@@ -11,6 +11,7 @@ PicturePtr glyph_cache_only(ScreenPtr pScreen, GlyphPtr pGlyph, xPoint *pos);
 PicturePtr glyph_cache(ScreenPtr pScreen, GlyphPtr pGlyph, xPoint *pos);
 Bool glyph_cache_preload(ScreenPtr pScreen, int nlist, GlyphListPtr list,
 	GlyphPtr *glyphs);
+void glyph_cache_remove(ScreenPtr pScreen, GlyphPtr pGlyph);
 
 #define NeedsComponent(f) (PICT_FORMAT_A(f) != 0 && PICT_FORMAT_RGB(f) != 0)
 

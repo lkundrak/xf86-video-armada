@@ -1185,6 +1185,15 @@ static void etnaviv_Glyphs(CARD8 op, PicturePtr pSrc, PicturePtr pDst,
 			       xSrc, ySrc, nlist, list, glyphs);
 }
 
+static void etnaviv_UnrealizeGlyph(ScreenPtr pScreen, GlyphPtr glyph)
+{
+	struct etnaviv *etnaviv = etnaviv_get_screen_priv(pScreen);
+
+	glyph_cache_remove(pScreen, glyph);
+
+	etnaviv->UnrealizeGlyph(pScreen, glyph);
+}
+
 static const unsigned glyph_formats[] = {
 	PICT_a8r8g8b8,
 	PICT_a8,
@@ -1237,6 +1246,7 @@ void etnaviv_render_screen_init(ScreenPtr pScreen)
 	etnaviv->Glyphs = ps->Glyphs;
 	ps->Glyphs = etnaviv_Glyphs;
 	etnaviv->UnrealizeGlyph = ps->UnrealizeGlyph;
+	ps->UnrealizeGlyph = etnaviv_UnrealizeGlyph;
 	etnaviv->Triangles = ps->Triangles;
 	ps->Triangles = unaccel_Triangles;
 	etnaviv->Trapezoids = ps->Trapezoids;

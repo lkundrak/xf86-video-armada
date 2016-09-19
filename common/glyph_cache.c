@@ -343,6 +343,17 @@ PicturePtr glyph_cache(ScreenPtr pScreen, GlyphPtr pGlyph, xPoint *pos)
 	return GetGlyphPicture(pGlyph, pScreen);
 }
 
+void glyph_cache_remove(ScreenPtr pScreen, GlyphPtr pGlyph)
+{
+	struct glyph_priv *priv;
+
+	priv = glyph_get_priv(pGlyph);
+	if (priv) {
+		priv->cache->glyphs[priv->index] = NULL;
+		glyph_set_priv(pGlyph, NULL);
+	}
+}
+
 /* Pre-load glyphs into the glyph cache before we start rendering. */
 Bool glyph_cache_preload(ScreenPtr pScreen, int nlist, GlyphListPtr list,
 	GlyphPtr *glyphs)
