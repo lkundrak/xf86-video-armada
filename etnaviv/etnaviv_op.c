@@ -419,7 +419,7 @@ void etnaviv_vr_op(struct etnaviv *etnaviv, struct etnaviv_vr_op *op,
 
 	etnaviv_set_dest_bo(etnaviv, &op->dst, op->cmd);
 
-	EL_START(etnaviv, 10 * 8 * n);
+	EL_START(etnaviv, 10 + 8 * n);
 	EL(LOADSTATE(VIVS_DE_ALPHA_CONTROL, 1));
 	EL(VIVS_DE_ALPHA_CONTROL_ENABLE_OFF);
 
