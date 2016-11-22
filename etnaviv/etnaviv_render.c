@@ -745,6 +745,13 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
 	uint32_t colour;
 
 	/*
+	 * If the mask has no alpha, then the alpha channel is treated
+	 * as constant 1.0.  This makes the IN operation redundant.
+	 */
+	if (!PICT_FORMAT_A(pMask->format) && !pMask->componentAlpha)
+		return TRUE;
+
+	/*
 	 * A PictOpOver with a mask looks like this:
 	 *
 	 *  dst.A = src.A * mask.A + dst.A * (1 - src.A * mask.A)
