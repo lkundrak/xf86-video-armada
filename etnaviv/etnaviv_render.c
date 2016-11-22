@@ -338,6 +338,35 @@ static Bool etnaviv_composite_to_pixmap(CARD8 op, PicturePtr pSrc,
 }
 
 /*
+ * There is a bug in the GPU hardware with destinations lacking alpha and
+ * swizzles BGRA/RGBA.  Rather than the GPU treating bits 7:0 as alpha, it
+ * continues to treat bits 31:24 as alpha.  This results in it replacing
+ * the B or R bits on input to the blend operation with 1.0.  However, it
+ * continues to accept the non-existent source alpha from bits 31:24.
+ *
+ * Work around this by switching to the equivalent alpha format, and using
+ * global alpha to replace the alpha channel.  The alpha channel subsitution
+ * is performed at this function's callsite.
+ */
+static Bool etnaviv_workaround_nonalpha(struct etnaviv_pixmap *vpix)
+{
+	switch (vpix->pict_format.format) {
+	case DE_FORMAT_X4R4G4B4:
+		vpix->pict_format.format = DE_FORMAT_A4R4G4B4;
+		return TRUE;
+	case DE_FORMAT_X1R5G5B5:
+		vpix->pict_format.format = DE_FORMAT_A1R5G5B5;
+		return TRUE;
+	case DE_FORMAT_X8R8G8B8:
+		vpix->pict_format.format = DE_FORMAT_A8R8G8B8;
+		return TRUE;
+	case DE_FORMAT_R5G6B5:
+		return TRUE;
+	}
+	return FALSE;
+}
+
+/*
  * Acquire the source. If we're filling a solid surface, force it to have
  * alpha; it may be used in combination with a mask.  Otherwise, we ask
  * for the plain source format, with or without alpha, and convert later
@@ -350,6 +379,7 @@ static struct etnaviv_pixmap *etnaviv_acquire_src(ScreenPtr pScreen,
 {
 	struct etnaviv *etnaviv = etnaviv_get_screen_priv(pScreen);
 	struct etnaviv_pixmap *vSrc, *vTemp;
+	struct etnaviv_blend_op copy_op;
 	DrawablePtr drawable;
 	uint32_t colour;
 	xPoint src_offset;
@@ -413,42 +443,20 @@ copy_to_vtemp:
 	if (!vTemp)
 		return NULL;
 
-	if (!etnaviv_blend(etnaviv, clip, NULL, vTemp, vSrc, clip, 1,
+	copy_op = etnaviv_composite_op[PictOpSrc];
+
+	if (etnaviv_workaround_nonalpha(vSrc)) {
+		copy_op.alpha_mode |= VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_GLOBAL;
+		copy_op.src_alpha = 255;
+	}
+
+	if (!etnaviv_blend(etnaviv, clip, &copy_op, vTemp, vSrc, clip, 1,
 			   *src_topleft, ZERO_OFFSET))
 		return NULL;
 
 	src_topleft->x = 0;
 	src_topleft->y = 0;
 	return vTemp;
-}
-
-/*
- * There is a bug in the GPU hardware with destinations lacking alpha and
- * swizzles BGRA/RGBA.  Rather than the GPU treating bits 7:0 as alpha, it
- * continues to treat bits 31:24 as alpha.  This results in it replacing
- * the B or R bits on input to the blend operation with 1.0.  However, it
- * continues to accept the non-existent source alpha from bits 31:24.
- *
- * Work around this by switching to the equivalent alpha format, and using
- * global alpha to replace the alpha channel.  The alpha channel subsitution
- * is performed at this function's callsite.
- */
-static Bool etnaviv_workaround_nonalpha(struct etnaviv_pixmap *vpix)
-{
-	switch (vpix->pict_format.format) {
-	case DE_FORMAT_X4R4G4B4:
-		vpix->pict_format.format = DE_FORMAT_A4R4G4B4;
-		return TRUE;
-	case DE_FORMAT_X1R5G5B5:
-		vpix->pict_format.format = DE_FORMAT_A1R5G5B5;
-		return TRUE;
-	case DE_FORMAT_X8R8G8B8:
-		vpix->pict_format.format = DE_FORMAT_A8R8G8B8;
-		return TRUE;
-	case DE_FORMAT_R5G6B5:
-		return TRUE;
-	}
-	return FALSE;
 }
 
 /*
