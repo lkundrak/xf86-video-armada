@@ -560,11 +560,13 @@ static int etnaviv_accel_composite_srconly(PicturePtr pSrc, PicturePtr pDst,
 		return FALSE;
 
 	/*
-	 * Apply the same work-around for a non-alpha source as for
-	 * a non-alpha destination.
+	 * Apply the same work-around for a non-alpha source as for a
+	 * non-alpha destination.  The test order is important here as
+	 * we must always have an alpha format, otherwise the selected
+	 * alpha mode (by etnaviv_accel_reduce_mask()) will be ignored.
 	 */
-	if (etnaviv_blend_src_alpha_normal(final_blend) &&
-	    etnaviv_workaround_nonalpha(vSrc)) {
+	if (etnaviv_workaround_nonalpha(vSrc) &&
+	    etnaviv_blend_src_alpha_normal(final_blend)) {
 		final_blend->alpha_mode |= VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_GLOBAL;
 		final_blend->src_alpha = 255;
 	}
