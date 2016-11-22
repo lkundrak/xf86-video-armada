@@ -641,6 +641,7 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 	}
 
 	if (pMask->pDrawable) {
+		xPoint mo;
 		int tx, ty;
 
 		if (!transform_is_integer_translation(pMask->transform, &tx, &ty))
@@ -656,17 +657,20 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 
 		mask_offset.x += pMask->pDrawable->x;
 		mask_offset.y += pMask->pDrawable->y;
+
+		/*
+		 * Check whether the mask has a etna bo backing it.  If not,
+		 * fallback to software for the mask operation.
+		 */
+		vMask = etnaviv_drawable_offset(pMask->pDrawable, &mo);
+		if (!vMask)
+			goto fallback;
+
+		mask_offset.x += mo.x;
+		mask_offset.y += mo.y;
 	} else {
 		goto fallback;
 	}
-
-	/*
-	 * Check whether the mask has a etna bo backing it.  If not,
-	 * fallback to software for the mask operation.
-	 */
-	vMask = etnaviv_drawable_offset(pMask->pDrawable, &mask_offset);
-	if (!vMask)
-		goto fallback;
 
 	etnaviv_set_format(vMask, pMask);
 
