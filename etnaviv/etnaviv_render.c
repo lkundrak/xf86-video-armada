@@ -682,6 +682,9 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 
 	etnaviv_set_format(vMask, pMask);
 
+	if (!etnaviv_src_format_valid(etnaviv, vMask->pict_format))
+		goto fallback;
+
 	/*
 	 * Get the source.  The source image will be described by vSrc with
 	 * origin src_topleft.  This will always be the temporary image,
