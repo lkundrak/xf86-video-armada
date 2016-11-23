@@ -503,6 +503,9 @@ static Bool etnaviv_CloseScreen(CLOSE_SCREEN_ARGS_DECL)
 	etnaviv_dri2_CloseScreen(CLOSE_SCREEN_ARGS);
 #endif
 
+	/* Ensure everything has been committed */
+	etnaviv_commit(etnaviv, TRUE, NULL);
+
 	pixmap = pScreen->GetScreenPixmap(pScreen);
 	etnaviv_free_pixmap(pixmap);
 
