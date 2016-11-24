@@ -43,6 +43,7 @@
 struct etnaviv_composite_state {
 	struct {
 		struct etnaviv_pixmap *pix;
+		xPoint offset;
 	} dst;
 	struct etnaviv_blend_op final_blend;
 	struct etnaviv_de_op final_op;
@@ -513,16 +514,13 @@ static Bool etnaviv_Composite_Clear(PicturePtr pDst, struct etnaviv_composite_st
 {
 	ScreenPtr pScreen = pDst->pDrawable->pScreen;
 	struct etnaviv *etnaviv = etnaviv_get_screen_priv(pScreen);
-	struct etnaviv_pixmap *vDst;
-	xPoint dst_offset;
-
-	vDst = etnaviv_drawable_offset(pDst->pDrawable, &dst_offset);
+	struct etnaviv_pixmap *vDst = state->dst.pix;
 
 	if (!etnaviv_map_gpu(etnaviv, vDst, GPU_ACCESS_RW))
 		return FALSE;
 
 	state->final_op.src = INIT_BLIT_PIX(vDst, vDst->pict_format, ZERO_OFFSET);
-	state->final_op.dst = INIT_BLIT_PIX(vDst, vDst->pict_format, dst_offset);
+	state->final_op.dst = INIT_BLIT_PIX(vDst, vDst->pict_format, state->dst.offset);
 
 	return TRUE;
 }
@@ -533,9 +531,9 @@ static int etnaviv_accel_composite_srconly(PicturePtr pSrc, PicturePtr pDst,
 {
 	ScreenPtr pScreen = pDst->pDrawable->pScreen;
 	struct etnaviv *etnaviv = etnaviv_get_screen_priv(pScreen);
-	struct etnaviv_pixmap *vDst, *vSrc;
+	struct etnaviv_pixmap *vSrc;
 	BoxRec clip_temp;
-	xPoint src_topleft, dst_offset;
+	xPoint src_topleft;
 
 	if (pSrc->alphaMap)
 		return FALSE;
@@ -584,17 +582,15 @@ static int etnaviv_accel_composite_srconly(PicturePtr pSrc, PicturePtr pDst,
 		state->final_blend.src_alpha = 255;
 	}
 
-	vDst = etnaviv_drawable_offset(pDst->pDrawable, &dst_offset);
+	src_topleft.x -= xDst + state->dst.offset.x;
+	src_topleft.y -= yDst + state->dst.offset.y;
 
-	src_topleft.x -= xDst + dst_offset.x;
-	src_topleft.y -= yDst + dst_offset.y;
-
-	if (!etnaviv_map_gpu(etnaviv, vDst, GPU_ACCESS_RW) ||
+	if (!etnaviv_map_gpu(etnaviv, state->dst.pix, GPU_ACCESS_RW) ||
 	    !etnaviv_map_gpu(etnaviv, vSrc, GPU_ACCESS_RO))
 		return FALSE;
 
 	state->final_op.src = INIT_BLIT_PIX(vSrc, vSrc->pict_format, src_topleft);
-	state->final_op.dst = INIT_BLIT_PIX(vDst, vDst->pict_format, dst_offset);
+	state->final_op.dst = INIT_BLIT_PIX(state->dst.pix, state->dst.pix->pict_format, state->dst.offset);
 
 	return TRUE;
 }
@@ -605,10 +601,10 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 {
 	ScreenPtr pScreen = pDst->pDrawable->pScreen;
 	struct etnaviv *etnaviv = etnaviv_get_screen_priv(pScreen);
-	struct etnaviv_pixmap *vDst, *vSrc, *vMask, *vTemp;
+	struct etnaviv_pixmap *vSrc, *vMask, *vTemp;
 	struct etnaviv_blend_op mask_op;
 	BoxRec clip_temp;
-	xPoint src_topleft, dst_offset, mask_offset;
+	xPoint src_topleft, mask_offset;
 
 	src_topleft.x = xSrc;
 	src_topleft.y = ySrc;
@@ -721,17 +717,15 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 		return FALSE;
 
 finish:
-	vDst = etnaviv_drawable_offset(pDst->pDrawable, &dst_offset);
+	src_topleft.x = -(xDst + state->dst.offset.x);
+	src_topleft.y = -(yDst + state->dst.offset.y);
 
-	src_topleft.x = -(xDst + dst_offset.x);
-	src_topleft.y = -(yDst + dst_offset.y);
-
-	if (!etnaviv_map_gpu(etnaviv, vDst, GPU_ACCESS_RW) ||
+	if (!etnaviv_map_gpu(etnaviv, state->dst.pix, GPU_ACCESS_RW) ||
 	    !etnaviv_map_gpu(etnaviv, vSrc, GPU_ACCESS_RO))
 		return FALSE;
 
 	state->final_op.src = INIT_BLIT_PIX(vSrc, vSrc->pict_format, src_topleft);
-	state->final_op.dst = INIT_BLIT_PIX(vDst, vDst->pict_format, dst_offset);
+	state->final_op.dst = INIT_BLIT_PIX(state->dst.pix, state->dst.pix->pict_format, state->dst.offset);
 
 	return TRUE;
 
@@ -875,7 +869,8 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 		return FALSE;
 
 	/* The destination pixmap must have a bo */
-	state.dst.pix = etnaviv_drawable(pDst->pDrawable);
+	state.dst.pix = etnaviv_drawable_offset(pDst->pDrawable,
+						&state.dst.offset);
 	if (!state.dst.pix)
 		return FALSE;
 
