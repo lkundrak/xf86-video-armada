@@ -996,6 +996,7 @@ static Bool etnaviv_accel_Glyphs(CARD8 final_op, PicturePtr pSrc,
 	ScreenPtr pScreen = pDst->pDrawable->pScreen;
 	struct etnaviv *etnaviv = etnaviv_get_screen_priv(pScreen);
 	struct etnaviv_pixmap *vMask;
+	struct etnaviv_format fmt;
 	struct etnaviv_de_op op;
 	PixmapPtr pMaskPixmap;
 	PicturePtr pMask, pCurrent;
@@ -1033,14 +1034,14 @@ static Bool etnaviv_accel_Glyphs(CARD8 final_op, PicturePtr pSrc,
 
 	vMask = etnaviv_get_pixmap_priv(pMaskPixmap);
 	/* Clear the mask to transparent */
-	etnaviv_set_format(vMask, pMask);
+	fmt = etnaviv_set_format(vMask, pMask);
 	box.x1 = box.y1 = 0;
 	box.x2 = width;
 	box.y2 = height;
 	if (!etnaviv_fill_single(etnaviv, vMask, &box, 0))
 		goto destroy_picture;
 
-	op.dst = INIT_BLIT_PIX(vMask, vMask->pict_format, ZERO_OFFSET);
+	op.dst = INIT_BLIT_PIX(vMask, fmt, ZERO_OFFSET);
 	op.blend_op = &etnaviv_composite_op[PictOpAdd];
 	op.clip = &box;
 	op.src_origin_mode = SRC_ORIGIN_NONE;
@@ -1115,6 +1116,7 @@ static void etnaviv_accel_glyph_upload(ScreenPtr pScreen, PicturePtr pDst,
 	PixmapPtr src_pix = drawable_pixmap(pSrc->pDrawable);
 	PixmapPtr dst_pix = drawable_pixmap(pDst->pDrawable);
 	struct etnaviv_pixmap *vdst = etnaviv_get_pixmap_priv(dst_pix);
+	struct etnaviv_format fmt;
 	struct etnaviv_de_op op;
 	unsigned width = pGlyph->info.width;
 	unsigned height = pGlyph->info.height;
@@ -1131,8 +1133,8 @@ static void etnaviv_accel_glyph_upload(ScreenPtr pScreen, PicturePtr pDst,
 
 	vpix = etnaviv_get_pixmap_priv(src_pix);
 	if (vpix) {
-		etnaviv_set_format(vpix, pSrc);
-		op.src = INIT_BLIT_PIX(vpix, vpix->pict_format, src_offset);
+		fmt = etnaviv_set_format(vpix, pSrc);
+		op.src = INIT_BLIT_PIX(vpix, fmt, src_offset);
 	} else {
 		struct etnaviv_usermem_node *unode;
 		char *buf, *src = src_pix->devPrivate.ptr;
@@ -1178,12 +1180,12 @@ static void etnaviv_accel_glyph_upload(ScreenPtr pScreen, PicturePtr pDst,
 	box.x2 = x + width;
 	box.y2 = y + height;
 
-	etnaviv_set_format(vdst, pDst);
+	fmt = etnaviv_set_format(vdst, pDst);
 
 	if (!etnaviv_map_gpu(etnaviv, vdst, GPU_ACCESS_RW))
 		return;
 
-	op.dst = INIT_BLIT_PIX(vdst, vdst->pict_format, dst_offset);
+	op.dst = INIT_BLIT_PIX(vdst, fmt, dst_offset);
 	op.blend_op = NULL;
 	op.clip = &box;
 	op.src_origin_mode = SRC_ORIGIN_RELATIVE;
