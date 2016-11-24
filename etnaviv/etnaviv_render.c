@@ -638,7 +638,7 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 
 	mask_op = etnaviv_composite_op[PictOpInReverse];
 
-	if (pMask->componentAlpha) {
+	if (pMask->componentAlpha && PICT_FORMAT_RGB(pMask->format)) {
 		/* Only PE2.0 can do component alpha blends. */
 		if (!VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20))
 			goto fallback;
@@ -750,11 +750,29 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
 {
 	uint32_t colour;
 
+	/* Deal with component alphas first */
+	if (pMask->componentAlpha && PICT_FORMAT_RGB(pMask->format)) {
+		/*
+		 * The component alpha operation is (for C in R,G,B,A):
+		 *  dst.C = tV.C * Fa(OP) + dst.C * Fb(OP)
+		 *   where tV.C = src.C * mask.C, tA.C = src.A * mask.C
+		 *   and Fa(OP) is the alpha factor based on dst.A
+		 *   and Fb(OP) is the alpha factor based on tA.C
+		 */
+		/* If the mask is solid white, the IN has no effect. */
+		if (etnaviv_pict_solid_argb(pMask, &colour)) {
+			if (colour == 0xffffffff)
+				return TRUE;
+		}
+
+		return FALSE;
+	}
+
 	/*
 	 * If the mask has no alpha, then the alpha channel is treated
 	 * as constant 1.0.  This makes the IN operation redundant.
 	 */
-	if (!PICT_FORMAT_A(pMask->format) && !pMask->componentAlpha)
+	if (!PICT_FORMAT_A(pMask->format))
 		return TRUE;
 
 	/*
@@ -786,7 +804,6 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
 	 * format must not have an alpha channel.
 	 */
 	if (op == PictOpOver &&
-	    !pMask->componentAlpha &&
 	    !PICT_FORMAT_A(pDst->format) &&
 	    etnaviv_pict_solid_argb(pMask, &colour)) {
 		uint32_t src_alpha_mode;
