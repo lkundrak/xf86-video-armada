@@ -520,7 +520,6 @@ static Bool etnaviv_Composite_Clear(PicturePtr pDst, struct etnaviv_composite_st
 		return FALSE;
 
 	state->final_op.src = INIT_BLIT_PIX(vDst, vDst->pict_format, ZERO_OFFSET);
-	state->final_op.dst = INIT_BLIT_PIX(vDst, vDst->pict_format, state->dst.offset);
 
 	return TRUE;
 }
@@ -590,7 +589,6 @@ static int etnaviv_accel_composite_srconly(PicturePtr pSrc, PicturePtr pDst,
 		return FALSE;
 
 	state->final_op.src = INIT_BLIT_PIX(vSrc, vSrc->pict_format, src_topleft);
-	state->final_op.dst = INIT_BLIT_PIX(state->dst.pix, state->dst.pix->pict_format, state->dst.offset);
 
 	return TRUE;
 }
@@ -725,7 +723,6 @@ finish:
 		return FALSE;
 
 	state->final_op.src = INIT_BLIT_PIX(vSrc, vSrc->pict_format, src_topleft);
-	state->final_op.dst = INIT_BLIT_PIX(state->dst.pix, state->dst.pix->pict_format, state->dst.offset);
 
 	return TRUE;
 
@@ -948,6 +945,9 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 	 * this step.
 	 */
 	if (rc) {
+		state.final_op.dst = INIT_BLIT_PIX(state.dst.pix,
+						   state.dst.pix->pict_format,
+						   state.dst.offset);
 		state.final_op.clip = RegionExtents(&state.region);
 		state.final_op.blend_op = &state.final_blend;
 		state.final_op.src_origin_mode = SRC_ORIGIN_RELATIVE;
