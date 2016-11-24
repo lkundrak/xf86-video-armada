@@ -43,6 +43,7 @@
 struct etnaviv_composite_state {
 	struct {
 		struct etnaviv_pixmap *pix;
+		struct etnaviv_format format;
 		xPoint offset;
 	} dst;
 	struct etnaviv_blend_op final_blend;
@@ -240,10 +241,11 @@ static Bool etnaviv_blend(struct etnaviv *etnaviv, const BoxRec *clip,
 	return TRUE;
 }
 
-static void etnaviv_set_format(struct etnaviv_pixmap *vpix, PicturePtr pict)
+static struct etnaviv_format etnaviv_set_format(struct etnaviv_pixmap *vpix, PicturePtr pict)
 {
 	vpix->pict_format = etnaviv_pict_format(pict->format);
 	vpix->pict_format.tile = vpix->format.tile;
+	return vpix->pict_format;
 }
 
 static struct etnaviv_pixmap *etnaviv_get_scratch_argb(ScreenPtr pScreen,
@@ -519,7 +521,7 @@ static Bool etnaviv_Composite_Clear(PicturePtr pDst, struct etnaviv_composite_st
 	if (!etnaviv_map_gpu(etnaviv, vDst, GPU_ACCESS_RW))
 		return FALSE;
 
-	state->final_op.src = INIT_BLIT_PIX(vDst, vDst->pict_format, ZERO_OFFSET);
+	state->final_op.src = INIT_BLIT_PIX(vDst, state->dst.format, ZERO_OFFSET);
 
 	return TRUE;
 }
@@ -871,10 +873,10 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 	if (!state.dst.pix)
 		return FALSE;
 
-	etnaviv_set_format(state.dst.pix, pDst);
+	state.dst.format = etnaviv_set_format(state.dst.pix, pDst);
 
 	/* ... and the destination format must be supported */
-	if (!etnaviv_dst_format_valid(etnaviv, state.dst.pix->pict_format))
+	if (!etnaviv_dst_format_valid(etnaviv, state.dst.format))
 		return FALSE;
 
 	state.final_blend = etnaviv_composite_op[op];
@@ -884,7 +886,7 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 	 * is important here: we only need the full workaround for non-
 	 * PictOpClear operations, but we still need the format adjustment.
 	 */
-	if (etnaviv_workaround_nonalpha(&state.dst.pix->pict_format) &&
+	if (etnaviv_workaround_nonalpha(&state.dst.format) &&
 	    op != PictOpClear) {
 		/*
 		 * Destination alpha channel subsitution - this needs
@@ -904,7 +906,7 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 		 * A4R4G4B4 limits src.A to the top four bits.
 		 */
 		if (!VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20) &&
-		    state.dst.pix->pict_format.format != DE_FORMAT_A8R8G8B8 &&
+		    state.dst.format.format != DE_FORMAT_A8R8G8B8 &&
 		    etnaviv_op_uses_source_alpha(&state.final_blend))
 			return FALSE;
 	}
@@ -947,7 +949,7 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 	 */
 	if (rc) {
 		state.final_op.dst = INIT_BLIT_PIX(state.dst.pix,
-						   state.dst.pix->pict_format,
+						   state.dst.format,
 						   state.dst.offset);
 		state.final_op.clip = RegionExtents(&state.region);
 		state.final_op.blend_op = &state.final_blend;
