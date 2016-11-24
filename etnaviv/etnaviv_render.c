@@ -363,17 +363,17 @@ static Bool etnaviv_composite_to_pixmap(CARD8 op, PicturePtr pSrc,
  * global alpha to replace the alpha channel.  The alpha channel subsitution
  * is performed at this function's callsite.
  */
-static Bool etnaviv_workaround_nonalpha(struct etnaviv_pixmap *vpix)
+static Bool etnaviv_workaround_nonalpha(struct etnaviv_format *fmt)
 {
-	switch (vpix->pict_format.format) {
+	switch (fmt->format) {
 	case DE_FORMAT_X4R4G4B4:
-		vpix->pict_format.format = DE_FORMAT_A4R4G4B4;
+		fmt->format = DE_FORMAT_A4R4G4B4;
 		return TRUE;
 	case DE_FORMAT_X1R5G5B5:
-		vpix->pict_format.format = DE_FORMAT_A1R5G5B5;
+		fmt->format = DE_FORMAT_A1R5G5B5;
 		return TRUE;
 	case DE_FORMAT_X8R8G8B8:
-		vpix->pict_format.format = DE_FORMAT_A8R8G8B8;
+		fmt->format = DE_FORMAT_A8R8G8B8;
 		return TRUE;
 	case DE_FORMAT_R5G6B5:
 		return TRUE;
@@ -460,7 +460,7 @@ copy_to_vtemp:
 
 	copy_op = etnaviv_composite_op[PictOpSrc];
 
-	if (etnaviv_workaround_nonalpha(vSrc)) {
+	if (etnaviv_workaround_nonalpha(&vSrc->pict_format)) {
 		copy_op.alpha_mode |= VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_GLOBAL;
 		copy_op.src_alpha = 255;
 	}
@@ -575,7 +575,7 @@ static int etnaviv_accel_composite_srconly(PicturePtr pSrc, PicturePtr pDst,
 	 * we must always have an alpha format, otherwise the selected
 	 * alpha mode (by etnaviv_accel_reduce_mask()) will be ignored.
 	 */
-	if (etnaviv_workaround_nonalpha(vSrc) &&
+	if (etnaviv_workaround_nonalpha(&vSrc->pict_format) &&
 	    etnaviv_blend_src_alpha_normal(&state->final_blend)) {
 		state->final_blend.alpha_mode |= VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_GLOBAL;
 		state->final_blend.src_alpha = 255;
@@ -884,7 +884,8 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 	 * is important here: we only need the full workaround for non-
 	 * PictOpClear operations, but we still need the format adjustment.
 	 */
-	if (etnaviv_workaround_nonalpha(state.dst.pix) && op != PictOpClear) {
+	if (etnaviv_workaround_nonalpha(&state.dst.pix->pict_format) &&
+	    op != PictOpClear) {
 		/*
 		 * Destination alpha channel subsitution - this needs
 		 * to happen before we modify the final blend for any
