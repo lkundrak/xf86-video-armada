@@ -40,6 +40,19 @@
 #include "etnaviv_utils.h"
 #include "etnaviv_compat.h"
 
+struct etnaviv_composite_state {
+	struct {
+		struct etnaviv_pixmap *pix;
+	} dst;
+	struct etnaviv_blend_op final_blend;
+	struct etnaviv_de_op final_op;
+	PixmapPtr pPixTemp;
+	RegionRec region;
+#ifdef DEBUG_BLEND
+	CARD8 op;
+#endif
+};
+
 static struct etnaviv_format etnaviv_pict_format(PictFormatShort fmt)
 {
 	unsigned int format, swizzle;
@@ -496,7 +509,7 @@ static Bool etnaviv_compute_composite_region(RegionPtr region,
 		RegionNotEmpty(region);
 }
 
-static Bool etnaviv_Composite_Clear(PicturePtr pDst, struct etnaviv_de_op *op)
+static Bool etnaviv_Composite_Clear(PicturePtr pDst, struct etnaviv_composite_state *state)
 {
 	ScreenPtr pScreen = pDst->pDrawable->pScreen;
 	struct etnaviv *etnaviv = etnaviv_get_screen_priv(pScreen);
@@ -508,16 +521,15 @@ static Bool etnaviv_Composite_Clear(PicturePtr pDst, struct etnaviv_de_op *op)
 	if (!etnaviv_map_gpu(etnaviv, vDst, GPU_ACCESS_RW))
 		return FALSE;
 
-	op->src = INIT_BLIT_PIX(vDst, vDst->pict_format, ZERO_OFFSET);
-	op->dst = INIT_BLIT_PIX(vDst, vDst->pict_format, dst_offset);
+	state->final_op.src = INIT_BLIT_PIX(vDst, vDst->pict_format, ZERO_OFFSET);
+	state->final_op.dst = INIT_BLIT_PIX(vDst, vDst->pict_format, dst_offset);
 
 	return TRUE;
 }
 
 static int etnaviv_accel_composite_srconly(PicturePtr pSrc, PicturePtr pDst,
 	INT16 xSrc, INT16 ySrc, INT16 xDst, INT16 yDst,
-	struct etnaviv_de_op *final_op, struct etnaviv_blend_op *final_blend,
-	RegionPtr region, PixmapPtr *ppPixTemp)
+	struct etnaviv_composite_state *state)
 {
 	ScreenPtr pScreen = pDst->pDrawable->pScreen;
 	struct etnaviv *etnaviv = etnaviv_get_screen_priv(pScreen);
@@ -543,7 +555,7 @@ static int etnaviv_accel_composite_srconly(PicturePtr pSrc, PicturePtr pDst,
 	 * Compute the temporary image clipping box, which is the
 	 * clipping region extents without the destination offset.
 	 */
-	clip_temp = *RegionExtents(region);
+	clip_temp = *RegionExtents(&state->region);
 	clip_temp.x1 -= xDst;
 	clip_temp.y1 -= yDst;
 	clip_temp.x2 -= xDst;
@@ -555,7 +567,7 @@ static int etnaviv_accel_composite_srconly(PicturePtr pSrc, PicturePtr pDst,
 	 * and vSrc->pict_format describes its format, including whether the
 	 * alpha channel is valid.
 	 */
-	vSrc = etnaviv_acquire_src(pScreen, pSrc, &clip_temp, ppPixTemp,
+	vSrc = etnaviv_acquire_src(pScreen, pSrc, &clip_temp, &state->pPixTemp,
 				   &src_topleft, FALSE);
 	if (!vSrc)
 		return FALSE;
@@ -567,9 +579,9 @@ static int etnaviv_accel_composite_srconly(PicturePtr pSrc, PicturePtr pDst,
 	 * alpha mode (by etnaviv_accel_reduce_mask()) will be ignored.
 	 */
 	if (etnaviv_workaround_nonalpha(vSrc) &&
-	    etnaviv_blend_src_alpha_normal(final_blend)) {
-		final_blend->alpha_mode |= VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_GLOBAL;
-		final_blend->src_alpha = 255;
+	    etnaviv_blend_src_alpha_normal(&state->final_blend)) {
+		state->final_blend.alpha_mode |= VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_GLOBAL;
+		state->final_blend.src_alpha = 255;
 	}
 
 	vDst = etnaviv_drawable_offset(pDst->pDrawable, &dst_offset);
@@ -581,21 +593,15 @@ static int etnaviv_accel_composite_srconly(PicturePtr pSrc, PicturePtr pDst,
 	    !etnaviv_map_gpu(etnaviv, vSrc, GPU_ACCESS_RO))
 		return FALSE;
 
-	final_op->src = INIT_BLIT_PIX(vSrc, vSrc->pict_format, src_topleft);
-	final_op->dst = INIT_BLIT_PIX(vDst, vDst->pict_format, dst_offset);
+	state->final_op.src = INIT_BLIT_PIX(vSrc, vSrc->pict_format, src_topleft);
+	state->final_op.dst = INIT_BLIT_PIX(vDst, vDst->pict_format, dst_offset);
 
 	return TRUE;
 }
 
 static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 	PicturePtr pDst, INT16 xSrc, INT16 ySrc, INT16 xMask, INT16 yMask,
-	INT16 xDst, INT16 yDst, struct etnaviv_de_op *final_op,
-	struct etnaviv_blend_op *final_blend, RegionPtr region,
-	PixmapPtr *ppPixTemp
-#ifdef DEBUG_BLEND
-	, CARD8 op
-#endif
-	)
+	INT16 xDst, INT16 yDst, struct etnaviv_composite_state *state)
 {
 	ScreenPtr pScreen = pDst->pDrawable->pScreen;
 	struct etnaviv *etnaviv = etnaviv_get_screen_priv(pScreen);
@@ -617,14 +623,14 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 	 * Compute the temporary image clipping box, which is the
 	 * clipping region extents without the destination offset.
 	 */
-	clip_temp = *RegionExtents(region);
+	clip_temp = *RegionExtents(&state->region);
 	clip_temp.x1 -= xDst;
 	clip_temp.y1 -= yDst;
 	clip_temp.x2 -= xDst;
 	clip_temp.y2 -= yDst;
 
 	/* Get a temporary pixmap. */
-	vTemp = etnaviv_get_scratch_argb(pScreen, ppPixTemp,
+	vTemp = etnaviv_get_scratch_argb(pScreen, &state->pPixTemp,
 					 clip_temp.x2, clip_temp.y2);
 	if (!vTemp)
 		return FALSE;
@@ -694,7 +700,7 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 	 * which will always have alpha - which is required for the final
 	 * blend.
 	 */
-	vSrc = etnaviv_acquire_src(pScreen, pSrc, &clip_temp, ppPixTemp,
+	vSrc = etnaviv_acquire_src(pScreen, pSrc, &clip_temp, &state->pPixTemp,
 				   &src_topleft, TRUE);
 	if (!vSrc)
 		goto fallback;
@@ -702,8 +708,8 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 #ifdef DEBUG_BLEND
 	etnaviv_batch_wait_commit(etnaviv, vSrc);
 	etnaviv_batch_wait_commit(etnaviv, vMask);
-	dump_vPix(etnaviv, vSrc, 1, "A-ISRC%2.2x-%p", op, pSrc);
-	dump_vPix(etnaviv, vMask, 1, "A-MASK%2.2x-%p", op, pMask);
+	dump_vPix(etnaviv, vSrc, 1, "A-ISRC%2.2x-%p", state->op, pSrc);
+	dump_vPix(etnaviv, vMask, 1, "A-MASK%2.2x-%p", state->op, pMask);
 #endif
 
 	/*
@@ -724,14 +730,14 @@ finish:
 	    !etnaviv_map_gpu(etnaviv, vSrc, GPU_ACCESS_RO))
 		return FALSE;
 
-	final_op->src = INIT_BLIT_PIX(vSrc, vSrc->pict_format, src_topleft);
-	final_op->dst = INIT_BLIT_PIX(vDst, vDst->pict_format, dst_offset);
+	state->final_op.src = INIT_BLIT_PIX(vSrc, vSrc->pict_format, src_topleft);
+	state->final_op.dst = INIT_BLIT_PIX(vDst, vDst->pict_format, dst_offset);
 
 	return TRUE;
 
 fallback:
 	/* Do the (src IN mask) in software instead */
-	if (!etnaviv_composite_to_pixmap(PictOpSrc, pSrc, pMask, *ppPixTemp,
+	if (!etnaviv_composite_to_pixmap(PictOpSrc, pSrc, pMask, state->pPixTemp,
 					 xSrc, ySrc, xMask, yMask,
 					 clip_temp.x2, clip_temp.y2))
 		return FALSE;
@@ -848,11 +854,7 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 {
 	ScreenPtr pScreen = pDst->pDrawable->pScreen;
 	struct etnaviv *etnaviv = etnaviv_get_screen_priv(pScreen);
-	struct etnaviv_pixmap *vDst;
-	struct etnaviv_blend_op final_blend;
-	struct etnaviv_de_op final_op;
-	PixmapPtr pPixTemp = NULL;
-	RegionRec region;
+	struct etnaviv_composite_state state;
 	int rc;
 
 #ifdef DEBUG_BLEND
@@ -860,7 +862,9 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 			       pSrc, xSrc, ySrc,
 			       pMask, xMask, yMask,
 			       pDst, xDst, yDst);
+	state.op = op;
 #endif
+	state.pPixTemp = NULL;
 
 	/* If the destination has an alpha map, fallback */
 	if (pDst->alphaMap)
@@ -871,32 +875,32 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 		return FALSE;
 
 	/* The destination pixmap must have a bo */
-	vDst = etnaviv_drawable(pDst->pDrawable);
-	if (!vDst)
+	state.dst.pix = etnaviv_drawable(pDst->pDrawable);
+	if (!state.dst.pix)
 		return FALSE;
 
-	etnaviv_set_format(vDst, pDst);
+	etnaviv_set_format(state.dst.pix, pDst);
 
 	/* ... and the destination format must be supported */
-	if (!etnaviv_dst_format_valid(etnaviv, vDst->pict_format))
+	if (!etnaviv_dst_format_valid(etnaviv, state.dst.pix->pict_format))
 		return FALSE;
 
-	final_blend = etnaviv_composite_op[op];
+	state.final_blend = etnaviv_composite_op[op];
 
 	/*
 	 * Apply the workaround for non-alpha destination.  The test order
 	 * is important here: we only need the full workaround for non-
 	 * PictOpClear operations, but we still need the format adjustment.
 	 */
-	if (etnaviv_workaround_nonalpha(vDst) && op != PictOpClear) {
+	if (etnaviv_workaround_nonalpha(state.dst.pix) && op != PictOpClear) {
 		/*
 		 * Destination alpha channel subsitution - this needs
 		 * to happen before we modify the final blend for any
 		 * optimisations, which may change the destination alpha
 		 * value, such as in etnaviv_accel_reduce_mask().
 		 */
-		final_blend.alpha_mode |= VIVS_DE_ALPHA_MODES_GLOBAL_DST_ALPHA_MODE_GLOBAL;
-		final_blend.dst_alpha = 255;
+		state.final_blend.alpha_mode |= VIVS_DE_ALPHA_MODES_GLOBAL_DST_ALPHA_MODE_GLOBAL;
+		state.final_blend.dst_alpha = 255;
 
 		/*
 		 * PE1.0 hardware contains a bug with non-A8* destinations.
@@ -907,8 +911,8 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 		 * A4R4G4B4 limits src.A to the top four bits.
 		 */
 		if (!VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20) &&
-		    vDst->pict_format.format != DE_FORMAT_A8R8G8B8 &&
-		    etnaviv_op_uses_source_alpha(&final_blend))
+		    state.dst.pix->pict_format.format != DE_FORMAT_A8R8G8B8 &&
+		    etnaviv_op_uses_source_alpha(&state.final_blend))
 			return FALSE;
 	}
 
@@ -917,7 +921,7 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 	 * destination positions on their backing pixmaps.  The
 	 * transformation is not applied at this stage.
 	 */
-	if (!etnaviv_compute_composite_region(&region, pSrc, pMask, pDst,
+	if (!etnaviv_compute_composite_region(&state.region, pSrc, pMask, pDst,
 					      xSrc, ySrc, xMask, yMask,
 					      xDst, yDst, width, height))
 		return TRUE;
@@ -928,24 +932,18 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 
 	if (op == PictOpClear) {
 		/* Short-circuit for PictOpClear */
-		rc = etnaviv_Composite_Clear(pDst, &final_op);
-	} else if (!pMask || etnaviv_accel_reduce_mask(&final_blend, op,
+		rc = etnaviv_Composite_Clear(pDst, &state);
+	} else if (!pMask || etnaviv_accel_reduce_mask(&state.final_blend, op,
 						       pSrc, pMask, pDst)) {
 		rc = etnaviv_accel_composite_srconly(pSrc, pDst,
 						     xSrc, ySrc,
 						     xDst, yDst,
-						     &final_op, &final_blend,
-						     &region, &pPixTemp);
+						     &state);
 	} else {
 		rc = etnaviv_accel_composite_masked(pSrc, pMask, pDst,
 						    xSrc, ySrc, xMask, yMask,
 						    xDst, yDst,
-						    &final_op, &final_blend,
-						    &region, &pPixTemp
-#ifdef DEBUG_BLEND
-						    , op
-#endif
-						    );
+						    &state);
 	}
 
 	/*
@@ -955,39 +953,40 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 	 * this step.
 	 */
 	if (rc) {
-		final_op.clip = RegionExtents(&region);
-		final_op.blend_op = &final_blend;
-		final_op.src_origin_mode = SRC_ORIGIN_RELATIVE;
-		final_op.rop = 0xcc;
-		final_op.cmd = VIVS_DE_DEST_CONFIG_COMMAND_BIT_BLT;
-		final_op.brush = FALSE;
+		state.final_op.clip = RegionExtents(&state.region);
+		state.final_op.blend_op = &state.final_blend;
+		state.final_op.src_origin_mode = SRC_ORIGIN_RELATIVE;
+		state.final_op.rop = 0xcc;
+		state.final_op.cmd = VIVS_DE_DEST_CONFIG_COMMAND_BIT_BLT;
+		state.final_op.brush = FALSE;
 
 #ifdef DEBUG_BLEND
-		etnaviv_batch_wait_commit(etnaviv, final_op.src.pixmap);
-		dump_vPix(etnaviv, final_op.src.pixmap, 1,
+		etnaviv_batch_wait_commit(etnaviv, state.final_op.src.pixmap);
+		dump_vPix(etnaviv, state.final_op.src.pixmap, 1,
 			  "A-FSRC%2.2x-%p", op, pSrc);
-		dump_vPix(etnaviv, final_op.dst.pixmap, 1,
+		dump_vPix(etnaviv, state.final_op.dst.pixmap, 1,
 			  "A-FDST%2.2x-%p", op, pDst);
 #endif
 
-		etnaviv_batch_start(etnaviv, &final_op);
-		etnaviv_de_op(etnaviv, &final_op, RegionRects(&region),
-			      RegionNumRects(&region));
+		etnaviv_batch_start(etnaviv, &state.final_op);
+		etnaviv_de_op(etnaviv, &state.final_op,
+			      RegionRects(&state.region),
+			      RegionNumRects(&state.region));
 		etnaviv_de_end(etnaviv);
 
 #ifdef DEBUG_BLEND
-		etnaviv_batch_wait_commit(etnaviv, final_op.dst.pixmap);
-		dump_vPix(etnaviv, final_op.dst.pixmap,
+		etnaviv_batch_wait_commit(etnaviv, state.final_op.dst.pixmap);
+		dump_vPix(etnaviv, state.final_op.dst.pixmap,
 			  PICT_FORMAT_A(pDst->format) != 0,
 			  "A-DEST%2.2x-%p", op, pDst);
 #endif
 	}
 
 	/* Destroy any temporary pixmap we may have allocated */
-	if (pPixTemp)
-		pScreen->DestroyPixmap(pPixTemp);
+	if (state.pPixTemp)
+		pScreen->DestroyPixmap(state.pPixTemp);
 
-	RegionUninit(&region);
+	RegionUninit(&state.region);
 
 	return rc;
 }
