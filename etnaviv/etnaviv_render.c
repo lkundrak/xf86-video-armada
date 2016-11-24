@@ -153,14 +153,15 @@ static const struct etnaviv_blend_op etnaviv_composite_op[] = {
 #undef OP
 };
 
+/* Source alpha is used when the destination mode is not ZERO or ONE */
 static Bool etnaviv_op_uses_source_alpha(struct etnaviv_blend_op *op)
 {
 	unsigned src;
 
-	src = op->alpha_mode & VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE__MASK;
+	src = op->alpha_mode & VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE__MASK;
 
-	if (src == VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_ZERO) ||
-	    src == VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_ONE))
+	if (src == VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_ZERO) ||
+	    src == VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_ONE))
 		return FALSE;
 
 	return TRUE;
@@ -881,11 +882,15 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 		final_blend.dst_alpha = 255;
 
 		/*
-		 * PE1.0 hardware contains a bug with destinations
-		 * of RGB565, which force src.A to one.
+		 * PE1.0 hardware contains a bug with non-A8* destinations.
+		 * Even though Fb is sampled from the source, it limits the
+		 * number of bits to that of the destination format:
+		 * RGB565 forces the src.A to one.
+		 * A1R5G5B5 limits src.A to the top bit.
+		 * A4R4G4B4 limits src.A to the top four bits.
 		 */
-		if (vDst->pict_format.format == DE_FORMAT_R5G6B5 &&
-		    !VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20) &&
+		if (!VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20) &&
+		    vDst->pict_format.format != DE_FORMAT_A8R8G8B8 &&
 		    etnaviv_op_uses_source_alpha(&final_blend))
 			return FALSE;
 	}
