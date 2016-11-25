@@ -775,6 +775,21 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
 		return TRUE;
 
 	/*
+	 * The mask must be a solid colour for any reducing.  At this
+	 * point, the only thing that matters is the value of the alpha
+	 * component.
+	 */
+	if (!etnaviv_pict_solid_argb(pMask, &colour))
+		return FALSE;
+
+	/* Convert the colour to A8 */
+	colour >>= 24;
+
+	/* If the alpha value is 1.0, the mask has no effect. */
+	if (colour == 0xff)
+		return TRUE;
+
+	/*
 	 * A PictOpOver with a mask looks like this:
 	 *
 	 *  dst.A = src.A * mask.A + dst.A * (1 - src.A * mask.A)
@@ -802,13 +817,8 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
 	 * and hence will be incorrect.  Therefore, the destination
 	 * format must not have an alpha channel.
 	 */
-	if (op == PictOpOver &&
-	    !PICT_FORMAT_A(pDst->format) &&
-	    etnaviv_pict_solid_argb(pMask, &colour)) {
+	if (op == PictOpOver && !PICT_FORMAT_A(pDst->format)) {
 		uint32_t src_alpha_mode;
-
-		/* Convert the colour to A8 */
-		colour >>= 24;
 
 		final_blend->src_alpha =
 		final_blend->dst_alpha = colour;
