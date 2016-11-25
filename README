@@ -13,6 +13,7 @@ and GPUs:
 
 	Vivnate libGAL (Armada only)
 	Etnaviv (Armada and i.MX) with galcore kernel driver
+	Etnaviv (Armada and i.MX) with etnaviv DRM kernel driver
 
 Build requirements
 ------------------
@@ -31,7 +32,7 @@ location of the built Etnaviv tree.
 
 The following packages are required by this driver:
 
-- libdrm-armada   git://ftp.arm.linux.org.uk/~rmk/libdrm-armada.git/
+- libdrm-armada   git://git.armlinux.org.uk/~rmk/libdrm-armada.git/
 
 The following packages are optional, but may be required for certain
 features:
@@ -49,3 +50,25 @@ What operations are accelerated?
   component alpha.
 - Xrender glyph caching, and rendering of glyphs - etnaviv only.
 - Xv textured adapter - etnaviv only.
+
+Rough build instructions
+------------------------
+
+$ git clone git://git.armlinux.org.uk/~rmk/libdrm-armada.git/
+$ cd libdrm-armada
+$ mkdir m4; autoreconf -f -i
+$ ./configure --prefix=/usr
+$ make
+$ make install
+$ cd ..
+$ git clone https://github.com/laanwj/etna_viv.git
+$ ETNA_SRC=$PWD/etna_viv
+$ git clone git://git.armlinux.org.uk/~rmk/xf86-video-armada.git/
+$ cd xf86-video-armada
+$ ./autogen.sh --prefix=/usr --disable-vivante --disable-etnaviv \
+  --with-etnaviv-source=$ETNA_SRC
+$ make
+$ make install
+$ cp conf/xorg-sample.conf /etc/X11/xorg.conf
+
+Now edit xorg.conf according to your needs (eg, setting XvPreferOverlay).
