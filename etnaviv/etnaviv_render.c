@@ -745,7 +745,7 @@ fallback:
  * GPU global alpha features.
  */
 static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
-	CARD8 op, PicturePtr pSrc, PicturePtr pMask, PicturePtr pDst)
+	PicturePtr pSrc, PicturePtr pMask, PicturePtr pDst)
 {
 	uint32_t colour;
 	uint32_t src_blend, dst_blend;
@@ -1011,7 +1011,7 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 	if (op == PictOpClear) {
 		/* Short-circuit for PictOpClear */
 		rc = etnaviv_Composite_Clear(pDst, &state);
-	} else if (!pMask || etnaviv_accel_reduce_mask(&state.final_blend, op,
+	} else if (!pMask || etnaviv_accel_reduce_mask(&state.final_blend,
 						       pSrc, pMask, pDst)) {
 		rc = etnaviv_accel_composite_srconly(pSrc, pDst,
 						     xSrc, ySrc,
