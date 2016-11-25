@@ -748,6 +748,7 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
 	CARD8 op, PicturePtr pSrc, PicturePtr pMask, PicturePtr pDst)
 {
 	uint32_t colour;
+	uint32_t src_blend, dst_blend;
 
 	/* Deal with component alphas first */
 	if (pMask->componentAlpha && PICT_FORMAT_RGB(pMask->format)) {
@@ -809,20 +810,89 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
 	 * are Fa = dst.A, Fb = 1 - src.A.
 	 *
 	 * If we subsitute src.A with src.A * mask.A, and dst.A with
-	 * mask.A, then we get pretty close for the colour channels.
+	 * mask.A, then we get pretty close for the colour channels:
+	 *
+	 *   dst.A = src.A * mask.A + mask.A * (1 - src.A * mask.A)
+	 *   dst.C = src.C * mask.A + dst.C  * (1 - src.A * mask.A)
+	 *
 	 * However, the alpha channel becomes simply:
 	 *
 	 *  dst.A = mask.A
 	 *
 	 * and hence will be incorrect.  Therefore, the destination
 	 * format must not have an alpha channel.
+	 *
+	 * We can do similar transformations for other operators as
+	 * well.
 	 */
-	if (op == PictOpOver && !PICT_FORMAT_A(pDst->format)) {
-		uint32_t src_alpha_mode;
+	src_blend = final_blend->alpha_mode &
+			VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE__MASK;
+	switch (src_blend) {
+	case VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_ZERO):
+		/*
+		 * Fa = 0, there is no source component in the output, so
+		 * there is no need for Fa to involve mask.A
+		 */
+		break;
 
-		final_blend->src_alpha =
+	case VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_NORMAL):
+		/*
+		 * Fa = Ad but we need Fa = mask.A * dst.A, so replace the
+		 * destination alpha with a scaled version.  However, we can
+		 * only do this on non-alpha destinations, hence Fa = mask.A.
+		 */
+	case VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_ONE):
+		/*
+		 * Fa = 1, but we need Fa = mask.A, so replace the destination
+		 * alpha with mask.A.  This will make the computed destination
+		 * alpha incorrect.
+		 */
+		if (PICT_FORMAT_A(pDst->format))
+			return FALSE;
+
+		/*
+		 * To replace Fa = 1 with mask.A, we subsitute global alpha
+		 * for dst.A, and switch the source blend mode to "NORMAL".
+		 */
+		src_blend = VIVS_DE_ALPHA_MODES_GLOBAL_DST_ALPHA_MODE_GLOBAL |
+		   VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_NORMAL);
 		final_blend->dst_alpha = colour;
+		break;
 
+	case VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_INVERSED):
+		/*
+		 * Fa = mask.A * (1 - dst.A) supportable for non-alpha
+		 * destinations as dst.A is defined as 1.0, making Fa = 0.
+		 */
+		if (PICT_FORMAT_A(pDst->format))
+			return FALSE;
+
+		src_blend =
+		   VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_ZERO);
+		break;
+
+	default:
+		/* Other blend modes unsupported. */
+		return FALSE;
+	}
+
+	dst_blend = final_blend->alpha_mode &
+			VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE__MASK;
+	switch (dst_blend) {
+	case VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_ZERO):
+	case VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_ONE):
+		/*
+		 * Fb = 0 or 1, no action required.
+		 */
+		break;
+
+	case VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_NORMAL):
+	case VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_INVERSED):
+		/*
+		 * Fb = mask.A * src.A or
+		 * Fb = 1 - mask.A * src.A
+		 */
+		final_blend->src_alpha = colour;
 		/*
 		 * With global scaled alpha and a non-alpha source,
 		 * the GPU appears to buggily read and use the X bits
@@ -830,19 +900,22 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
 		 * source alpha instead for this case.
 		 */
 		if (PICT_FORMAT_A(pSrc->format))
-			src_alpha_mode = VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_SCALED;
+			dst_blend |= VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_SCALED;
 		else
-			src_alpha_mode = VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_GLOBAL;
+			dst_blend |= VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_GLOBAL;
+		break;
 
-		final_blend->alpha_mode = src_alpha_mode |
-			VIVS_DE_ALPHA_MODES_GLOBAL_DST_ALPHA_MODE_GLOBAL |
-			VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_NORMAL) |
-			VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_INVERSED);
-
-		return TRUE;
+	default:
+		/* Other blend modes unsupported. */
+		return FALSE;
 	}
 
-	return FALSE;
+	final_blend->alpha_mode &=
+			~(VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE__MASK |
+			  VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE__MASK);
+	final_blend->alpha_mode |= src_blend | dst_blend;
+
+	return TRUE;
 }
 
 /*
