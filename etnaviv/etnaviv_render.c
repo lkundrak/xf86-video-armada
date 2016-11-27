@@ -146,11 +146,8 @@ static Bool picture_needs_repeat(PicturePtr pPict, int x, int y,
 static const struct etnaviv_blend_op etnaviv_composite_op[] = {
 #define OP(op,s,d) \
 	[PictOp##op] = { \
-		.alpha_mode = \
-			VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_NORMAL | \
-			VIVS_DE_ALPHA_MODES_GLOBAL_DST_ALPHA_MODE_NORMAL | \
-			VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_##s) | \
-			VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_##d), \
+		.src_mode = DE_BLENDMODE_##s, \
+		.dst_mode = DE_BLENDMODE_##d, \
 	}
 	OP(Clear,       ZERO,     ZERO),
 	OP(Src,         ONE,      ZERO),
@@ -171,12 +168,8 @@ static const struct etnaviv_blend_op etnaviv_composite_op[] = {
 /* Source alpha is used when the destination mode is not ZERO or ONE */
 static Bool etnaviv_op_uses_source_alpha(struct etnaviv_blend_op *op)
 {
-	unsigned src;
-
-	src = op->alpha_mode & VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE__MASK;
-
-	if (src == VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_ZERO) ||
-	    src == VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_ONE))
+	if (op->dst_mode == DE_BLENDMODE_ZERO ||
+	    op->dst_mode == DE_BLENDMODE_ONE)
 		return FALSE;
 
 	return TRUE;
@@ -361,9 +354,8 @@ static Bool etnaviv_composite_to_pixmap(CARD8 op, PicturePtr pSrc,
  * the B or R bits on input to the blend operation with 1.0.  However, it
  * continues to accept the non-existent source alpha from bits 31:24.
  *
- * Work around this by switching to the equivalent alpha format, and using
- * global alpha to replace the alpha channel.  The alpha channel subsitution
- * is performed at this function's callsite.
+ * Work around this by switching to the equivalent alpha format, and adjust
+ * blend operation or alpha subsitution appropriately at the call site.
  */
 static Bool etnaviv_workaround_nonalpha(struct etnaviv_format *fmt)
 {
@@ -744,11 +736,11 @@ fallback:
  * a simpler s OP' d operation, possibly modifying OP' to use the
  * GPU global alpha features.
  */
-static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
+static Bool etnaviv_accel_reduce_mask(struct etnaviv_composite_state *state,
 	PicturePtr pSrc, PicturePtr pMask, PicturePtr pDst)
 {
-	uint32_t colour;
-	uint32_t src_blend, dst_blend;
+	uint32_t colour, alpha_mode = 0;
+	uint8_t src_mode;
 
 	/* Deal with component alphas first */
 	if (pMask->componentAlpha && PICT_FORMAT_RGB(pMask->format)) {
@@ -825,23 +817,21 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
 	 * We can do similar transformations for other operators as
 	 * well.
 	 */
-	src_blend = final_blend->alpha_mode &
-			VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE__MASK;
-	switch (src_blend) {
-	case VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_ZERO):
+	switch (src_mode = state->final_blend.src_mode) {
+	case DE_BLENDMODE_ZERO:
 		/*
 		 * Fa = 0, there is no source component in the output, so
 		 * there is no need for Fa to involve mask.A
 		 */
 		break;
 
-	case VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_NORMAL):
+	case DE_BLENDMODE_NORMAL:
 		/*
 		 * Fa = Ad but we need Fa = mask.A * dst.A, so replace the
 		 * destination alpha with a scaled version.  However, we can
 		 * only do this on non-alpha destinations, hence Fa = mask.A.
 		 */
-	case VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_ONE):
+	case DE_BLENDMODE_ONE:
 		/*
 		 * Fa = 1, but we need Fa = mask.A, so replace the destination
 		 * alpha with mask.A.  This will make the computed destination
@@ -854,12 +844,12 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
 		 * To replace Fa = 1 with mask.A, we subsitute global alpha
 		 * for dst.A, and switch the source blend mode to "NORMAL".
 		 */
-		src_blend = VIVS_DE_ALPHA_MODES_GLOBAL_DST_ALPHA_MODE_GLOBAL |
-		   VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_NORMAL);
-		final_blend->dst_alpha = colour;
+		alpha_mode |= VIVS_DE_ALPHA_MODES_GLOBAL_DST_ALPHA_MODE_GLOBAL;
+		src_mode = DE_BLENDMODE_NORMAL;
+		state->final_blend.dst_alpha = colour;
 		break;
 
-	case VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_INVERSED):
+	case DE_BLENDMODE_INVERSED:
 		/*
 		 * Fa = mask.A * (1 - dst.A) supportable for non-alpha
 		 * destinations as dst.A is defined as 1.0, making Fa = 0.
@@ -867,8 +857,7 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
 		if (PICT_FORMAT_A(pDst->format))
 			return FALSE;
 
-		src_blend =
-		   VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_ZERO);
+		src_mode = DE_BLENDMODE_ZERO;
 		break;
 
 	default:
@@ -876,23 +865,21 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
 		return FALSE;
 	}
 
-	dst_blend = final_blend->alpha_mode &
-			VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE__MASK;
-	switch (dst_blend) {
-	case VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_ZERO):
-	case VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_ONE):
+	switch (state->final_blend.dst_mode) {
+	case DE_BLENDMODE_ZERO:
+	case DE_BLENDMODE_ONE:
 		/*
 		 * Fb = 0 or 1, no action required.
 		 */
 		break;
 
-	case VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_NORMAL):
-	case VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_INVERSED):
+	case DE_BLENDMODE_NORMAL:
+	case DE_BLENDMODE_INVERSED:
 		/*
 		 * Fb = mask.A * src.A or
 		 * Fb = 1 - mask.A * src.A
 		 */
-		final_blend->src_alpha = colour;
+		state->final_blend.src_alpha = colour;
 		/*
 		 * With global scaled alpha and a non-alpha source,
 		 * the GPU appears to buggily read and use the X bits
@@ -900,9 +887,9 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
 		 * source alpha instead for this case.
 		 */
 		if (PICT_FORMAT_A(pSrc->format))
-			dst_blend |= VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_SCALED;
+			alpha_mode |= VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_SCALED;
 		else
-			dst_blend |= VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_GLOBAL;
+			alpha_mode |= VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_GLOBAL;
 		break;
 
 	default:
@@ -910,10 +897,8 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_blend_op *final_blend,
 		return FALSE;
 	}
 
-	final_blend->alpha_mode &=
-			~(VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE__MASK |
-			  VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE__MASK);
-	final_blend->alpha_mode |= src_blend | dst_blend;
+	state->final_blend.src_mode = src_mode;
+	state->final_blend.alpha_mode |= alpha_mode;
 
 	return TRUE;
 }
@@ -1011,7 +996,7 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 	if (op == PictOpClear) {
 		/* Short-circuit for PictOpClear */
 		rc = etnaviv_Composite_Clear(pDst, &state);
-	} else if (!pMask || etnaviv_accel_reduce_mask(&state.final_blend,
+	} else if (!pMask || etnaviv_accel_reduce_mask(&state,
 						       pSrc, pMask, pDst)) {
 		rc = etnaviv_accel_composite_srconly(pSrc, pDst,
 						     xSrc, ySrc,
