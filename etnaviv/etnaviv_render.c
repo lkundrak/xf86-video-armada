@@ -830,6 +830,7 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_composite_state *state,
 		 * Fa = Ad but we need Fa = mask.A * dst.A, so replace the
 		 * destination alpha with a scaled version.  However, we can
 		 * only do this on non-alpha destinations, hence Fa = mask.A.
+		 * Note: non-alpha destinations should never see NORMAL here.
 		 */
 	case DE_BLENDMODE_ONE:
 		/*
@@ -853,6 +854,7 @@ static Bool etnaviv_accel_reduce_mask(struct etnaviv_composite_state *state,
 		/*
 		 * Fa = mask.A * (1 - dst.A) supportable for non-alpha
 		 * destinations as dst.A is defined as 1.0, making Fa = 0.
+		 * Note: non-alpha destinations should never see INVERSED here.
 		 */
 		if (PICT_FORMAT_A(pDst->format))
 			return FALSE;
@@ -957,13 +959,20 @@ static int etnaviv_accel_Composite(CARD8 op, PicturePtr pSrc, PicturePtr pMask,
 	if (etnaviv_workaround_nonalpha(&state.dst.format) &&
 	    op != PictOpClear) {
 		/*
-		 * Destination alpha channel subsitution - this needs
-		 * to happen before we modify the final blend for any
-		 * optimisations, which may change the destination alpha
-		 * value, such as in etnaviv_accel_reduce_mask().
+		 * When the destination does not have an alpha channel, we
+		 * need to provide an alpha value of 1.0, and the computed
+		 * alpha is irrelevant.  Replace source modes which depend
+		 * on destination alpha with their corresponding constant
+		 * value modes, rather than using global alpha subsitution.
 		 */
-		state.final_blend.alpha_mode |= VIVS_DE_ALPHA_MODES_GLOBAL_DST_ALPHA_MODE_GLOBAL;
-		state.final_blend.dst_alpha = 255;
+		switch (state.final_blend.src_mode) {
+		case DE_BLENDMODE_NORMAL:
+			state.final_blend.src_mode = DE_BLENDMODE_ONE;
+			break;
+		case DE_BLENDMODE_INVERSED:
+			state.final_blend.src_mode = DE_BLENDMODE_ZERO;
+			break;
+		}
 
 		/*
 		 * PE1.0 hardware contains a bug with non-A8* destinations.
