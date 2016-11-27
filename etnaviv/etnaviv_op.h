@@ -28,6 +28,8 @@ struct etnaviv_format {
 
 struct etnaviv_blend_op {
 	uint32_t alpha_mode;
+	uint8_t src_mode;	/* DE_BLENDMODE_xx */
+	uint8_t dst_mode;	/* DE_BLENDMODE_xx */
 	uint8_t src_alpha;
 	uint8_t dst_alpha;
 };

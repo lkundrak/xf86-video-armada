@@ -190,12 +190,17 @@ static void etnaviv_set_blend(struct etnaviv *etnaviv,
 		EL(VIVS_DE_ALPHA_CONTROL_ENABLE_OFF);
 	} else {
 		Bool pe20 = VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20);
+		uint32_t alpha_mode;
+
+		alpha_mode = op->alpha_mode |
+			VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(op->src_mode) |
+			VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(op->dst_mode);
 
 		EL(LOADSTATE(VIVS_DE_ALPHA_CONTROL, 2));
 		EL(VIVS_DE_ALPHA_CONTROL_ENABLE_ON |
 		   VIVS_DE_ALPHA_CONTROL_PE10_GLOBAL_SRC_ALPHA(op->src_alpha) |
 		   VIVS_DE_ALPHA_CONTROL_PE10_GLOBAL_DST_ALPHA(op->dst_alpha));
-		EL(op->alpha_mode);
+		EL(alpha_mode);
 		EL_ALIGN();
 
 		if (pe20) {
