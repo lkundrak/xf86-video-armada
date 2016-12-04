@@ -11,6 +11,8 @@
 #include "config.h"
 #endif
 
+#include "xf86.h"
+
 #include "fb.h"
 #include "fbpict.h"
 #include "mipict.h"

@@ -98,4 +98,12 @@
 
 #endif
 
+#if ABI_VIDEODRV_VERSION >= SET_ABI_VERSION(23,0)
+#undef BLOCKHANDLER_ARGS_DECL
+#undef BLOCKHANDLER_ARGS
+
+#define BLOCKHANDLER_ARGS_DECL ScreenPtr arg, void *pTimeout
+#define BLOCKHANDLER_ARGS arg, pTimeout
+#endif
+
 #endif
