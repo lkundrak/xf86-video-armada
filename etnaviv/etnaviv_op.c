@@ -424,7 +424,7 @@ void etnaviv_vr_op(struct etnaviv *etnaviv, struct etnaviv_vr_op *op,
 
 	etnaviv_set_dest_bo(etnaviv, &op->dst, op->cmd);
 
-	EL_START(etnaviv, 10 + 8 * n);
+	EL_START(etnaviv, 10);
 	EL(LOADSTATE(VIVS_DE_ALPHA_CONTROL, 1));
 	EL(VIVS_DE_ALPHA_CONTROL_ENABLE_OFF);
 
@@ -438,11 +438,17 @@ void etnaviv_vr_op(struct etnaviv *etnaviv, struct etnaviv_vr_op *op,
 	   VIVS_DE_VR_SOURCE_IMAGE_LOW_TOP(op->src_bounds.y1));
 	EL(VIVS_DE_VR_SOURCE_IMAGE_HIGH_RIGHT(op->src_bounds.x2) |
 	   VIVS_DE_VR_SOURCE_IMAGE_HIGH_BOTTOM(op->src_bounds.y2));
-	EL_ALIGN();
+	EL_END();
+	BATCH_SETUP_END(etnaviv);
 
 	while (n--) {
-		BoxRec box = *boxes++;
+		BoxRec box = *boxes;
 		uint32_t x, y;
+
+		if (8 > MAX_BATCH_SIZE - etnaviv->batch_size) {
+			etnaviv_emit(etnaviv);
+			BATCH_OP_START(etnaviv);
+		}
 
 		x = x1 + (box.x1 - dst->x1) * op->h_scale;
 		y = y1 + (box.y1 - dst->y1) * op->v_scale;
@@ -453,6 +459,7 @@ void etnaviv_vr_op(struct etnaviv *etnaviv, struct etnaviv_vr_op *op,
 		box.x2 += op->dst.offset.x;
 		box.y2 += op->dst.offset.y;
 
+		EL_START(etnaviv, 8);
 		/* 6 */
 		EL(LOADSTATE(VIVS_DE_VR_SOURCE_ORIGIN_LOW, 4));
 		EL(VIVS_DE_VR_SOURCE_ORIGIN_LOW_X(x));
@@ -466,8 +473,9 @@ void etnaviv_vr_op(struct etnaviv *etnaviv, struct etnaviv_vr_op *op,
 		/* 2 */
 		EL(LOADSTATE(VIVS_DE_VR_CONFIG, 1));
 		EL(op->vr_op);
+		EL_END();
+		boxes++;
 	}
-	EL_END();
 
 	etnaviv_emit(etnaviv);
 }
