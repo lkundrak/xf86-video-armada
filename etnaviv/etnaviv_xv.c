@@ -426,7 +426,17 @@ static int etnaviv_configure_format(struct etnaviv_xv_priv *priv,
 		priv->stage1_format.tile = 1;
 		priv->stage1_pitch = etnaviv_tile_pitch(width, bpp);
 	} else if (VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20)) {
-		priv->stage1_format = fmt_yuy2;
+		/*
+		 * Documentation (for example i.MX6 reference manual chapter
+		 * 31.4.1.6 Filter BLT) states that the only valid stage1 format
+		 * for the filter blit is YUY2. However in reality it seems that
+		 * we must match the internal component ordering of the source
+		 * image, otherwise the stage1 buffer will be zero filled.
+		 */
+		if (priv->source_format.format == DE_FORMAT_UYVY)
+			priv->stage1_format = fmt_uyvy;
+		else
+			priv->stage1_format = fmt_yuy2;
 		priv->stage1_pitch = etnaviv_pitch(width, 16);
 	} else {
 		priv->stage1_format = vPix->format;
