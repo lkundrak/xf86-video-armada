@@ -413,6 +413,9 @@ static struct etnaviv_pixmap *etnaviv_acquire_src(ScreenPtr pScreen,
 	if (!vSrc)
 		goto fallback;
 
+	if (vSrc->width < clip->x2 || vSrc->height < clip->y2)
+		goto fallback;
+
 	etnaviv_set_format(vSrc, pict);
 	if (!etnaviv_src_format_valid(etnaviv, vSrc->pict_format))
 		goto fallback;
@@ -669,6 +672,9 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 		 */
 		vMask = etnaviv_drawable_offset(pMask->pDrawable, &mo);
 		if (!vMask)
+			goto fallback;
+
+		if (vMask->width < clip_temp.x2 || vMask->height < clip_temp.y2)
 			goto fallback;
 
 		mask_offset.x += mo.x;
