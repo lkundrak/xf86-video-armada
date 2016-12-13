@@ -643,9 +643,9 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 		/* Adjust the mask blend (InReverse) to perform the blend. */
 		mask_op.alpha_mode =
 			VIVS_DE_ALPHA_MODES_GLOBAL_SRC_ALPHA_MODE_NORMAL |
-			VIVS_DE_ALPHA_MODES_GLOBAL_DST_ALPHA_MODE_NORMAL |
-			VIVS_DE_ALPHA_MODES_SRC_BLENDING_MODE(DE_BLENDMODE_ZERO) |
-			VIVS_DE_ALPHA_MODES_DST_BLENDING_MODE(DE_BLENDMODE_COLOR);
+			VIVS_DE_ALPHA_MODES_GLOBAL_DST_ALPHA_MODE_NORMAL;
+		mask_op.src_mode = DE_BLENDMODE_ZERO;
+		mask_op.dst_mode = DE_BLENDMODE_COLOR;
 	}
 
 	if (pMask->pDrawable) {
