@@ -28,6 +28,7 @@ libcommon_la_SOURCES = \
 		cpu_access.h \
 		drawable_desc.c \
 		fbutil.h \
+		fourcc.h \
 		gal_extension.h \
 		get_first_pixel.c \
 		glyph_assemble.c \

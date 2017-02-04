@@ -19,10 +19,10 @@
 #include "xf86Crtc.h"
 #include "xf86xv.h"
 #include "damage.h"
-#include "fourcc.h"
 #include <X11/extensions/Xv.h>
 
 #include "compat-api.h"
+#include "fourcc.h"
 #include "pixmaputil.h"
 #include "utils.h"
 #include "xv_attribute.h"

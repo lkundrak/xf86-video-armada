@@ -1,5 +1,9 @@
-#ifndef ARMADA_FOURCC_H
-#define ARMADA_FOURCC_H
+#ifndef COMMON_FOURCC_H
+#define COMMON_FOURCC_H
+
+#include <drm/drm_fourcc.h>
+/* pick up on the Xorg fourcc.h. */
+#include <fourcc.h>
 
 #define GUID4CC(a,b,c,d) { a,b,c,d, 0x00,0x00,0x00,0x10,0x80,0x00,0x00,0xAA,0x00,0x38,0x9B,0x71 }
 

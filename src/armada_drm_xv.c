@@ -18,16 +18,14 @@
 #include "armada_accel.h"
 #include "armada_drm.h"
 #include "common_drm.h"
-#include "drm_fourcc.h"
 #include "xf86Crtc.h"
 #include "xf86xv.h"
-#include "fourcc.h"
 #include "utils.h"
 #include <X11/extensions/Xv.h>
 #include <X11/Xatom.h>
 
-#include "armada_fourcc.h"
 #include "armada_ioctl.h"
+#include "fourcc.h"
 #include "xv_attribute.h"
 #include "xv_image_format.h"
 #include "xvbo.h"
