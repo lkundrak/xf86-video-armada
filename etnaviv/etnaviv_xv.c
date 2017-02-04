@@ -73,6 +73,12 @@ static XF86VideoFormatRec etnaviv_formats[] = {
 	},
 };
 
+static const struct etnaviv_format fmt_xrgb8888 = {
+	.format = DE_FORMAT_X8R8G8B8,
+	.swizzle = DE_SWIZZLE_ARGB,
+	.planes = 1,
+};
+
 static const struct etnaviv_format fmt_uyvy = {
 	.format = DE_FORMAT_UYVY,
 	.swizzle = DE_SWIZZLE_ARGB,
@@ -114,6 +120,9 @@ static const struct xv_image_format etnaviv_image_formats[] = {
 	}, {
 		.u.data = &fmt_i420,
 		.xv_image = XVIMAGE_I420,
+	}, {
+		.u.data = &fmt_xrgb8888,
+		.xv_image = XVIMAGE_XRGB8888,
 	}, {
 		.u.data = NULL,
 		.xv_image = XVIMAGE_XVBO,
