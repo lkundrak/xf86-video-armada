@@ -423,8 +423,7 @@ static int etnaviv_configure_format(struct etnaviv_xv_priv *priv,
 			priv->stage1_format = priv->source_format;
 			bpp = fmt->xv_image.bits_per_pixel;
 		}
-		priv->stage1_format.tile = 1;
-		priv->stage1_pitch = etnaviv_tile_pitch(width, bpp);
+		priv->stage1_pitch = etnaviv_pitch(width, bpp);
 	} else if (VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20)) {
 		/*
 		 * Documentation (for example i.MX6 reference manual chapter
@@ -566,10 +565,7 @@ static int etnaviv_PutImage(ScrnInfoPtr pScrn,
 		size_t stage1_size = priv->stage1_pitch;
 		BoxRec box;
 
-		if (priv->stage1_format.tile)
-			stage1_size *= etnaviv_tile_height(drw_h);
-		else
-			stage1_size *= drw_h;
+		stage1_size *= drw_h;
 
 		/* Check whether we need to reallocate the temporary bo */
 		if (stage1_size > priv->stage1_size &&
@@ -889,7 +885,7 @@ XF86VideoAdaptorPtr etnaviv_xv_init(ScreenPtr pScreen, unsigned int *caps)
 	has_yuy2 = VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20);
 	xf86DrvMsg(pScrn->scrnIndex, X_INFO,
 		   "etnaviv: Xv: using %s format intermediate YUV target\n",
-		   has_yuy2 ? "YUY2 tiled" : "destination");
+		   has_yuy2 ? "YUY2" : "destination");
 
 	etnaviv->xv = priv;
 	etnaviv->xv_ports = nports;
