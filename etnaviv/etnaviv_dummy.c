@@ -2,7 +2,6 @@
  * libetnaviv "compatibility" with additional etnaviv/drm APIs
  */
 #include <etnaviv/viv.h>
-#include <etnaviv/etna.h>
 #include "etnaviv_compat.h"
 
 int etna_bo_flink(struct etna_bo *bo, uint32_t *name)

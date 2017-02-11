@@ -9,6 +9,8 @@
 #include "etnaviv_op.h"
 #include "etnadrm.h"
 
+#include <etnaviv/etna.h>
+
 void etnaviv_emit(struct etnaviv *etnaviv)
 {
 	struct etna_ctx *ctx = etnaviv->ctx;

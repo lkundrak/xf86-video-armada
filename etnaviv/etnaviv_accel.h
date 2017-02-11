@@ -13,7 +13,6 @@
 #include "etnaviv_compat_xorg.h"
 
 #include <etnaviv/viv.h>
-#include <etnaviv/etna.h>
 #include <etnaviv/etna_bo.h>
 
 struct armada_accel_ops;

@@ -29,6 +29,7 @@
 #include "etnaviv_accel.h"
 #include "etnaviv_utils.h"
 
+#include <etnaviv/common.xml.h>
 #include <etnaviv/state_2d.xml.h>
 #include "etnaviv_compat.h"
 

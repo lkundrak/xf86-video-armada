@@ -8,6 +8,8 @@
 #include "etnaviv_accel.h"
 #include "etnaviv_op.h"
 
+#include <etnaviv/etna.h>
+
 void etnaviv_emit(struct etnaviv *etnaviv)
 {
 	struct etna_ctx *ctx = etnaviv->ctx;
