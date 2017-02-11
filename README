@@ -9,33 +9,53 @@ System as implemented by X.org, supporting these DRM KMS drivers:
 	Freescale i.MX
 	Marvell Armada 510 (Dove)
 
-and GPUs:
+and GPU drivers:
 
-	Vivnate libGAL (Armada only)
+	Vivante libGAL (Armada only)
 	Etnaviv (Armada and i.MX) with galcore kernel driver
 	Etnaviv (Armada and i.MX) with etnaviv DRM kernel driver
 
 Build requirements
 ------------------
 xf86-video-armada can be built as a stand-alone KMS driver, or with
-Vivante and/or Etnaviv GPU support.
+Vivante and/or Etnaviv GPU support.  Please carefully note that there
+are three variants of GPU driver for Vivante GPUs, and confusingly
+two of the open source variants that are quite different are both
+called "etnaviv" by their authors.  I will refer to the DRM version
+as "etnadrm" below.
 
 When building with Vivante libGAL support, the configure options
 --with-libgal-include= and --with-libgal-lib= should indicate the
-location of the libGAL headers and library respectively.
+location of the libGAL headers and library respectively if they
+are not available via the compiler's standard include and library
+paths.  Vivante libGAL support can be explicitly enabled or disabled
+via the --enable-vivante and --disable-vivante configure options,
+otherwise support will be automatically detected.
 
 When building Etnaviv support, the configure options
 --with-etnaviv-include= and --with-etnaviv-lib= should indicate the
-location of the etnaviv headers and library respectively.
-Alternatively, --with-etnaviv-source= can be used to indicate the
-location of the built Etnaviv tree.
+location of the etnaviv headers and library respectively if they
+are not available via the compiler's standard include and library
+paths.  Alternatively, --with-etnaviv-source= can be used to indicate
+the location of the built Etnaviv tree.  Etnaviv (aka libetnaviv)
+support can be explicitly enabled or disabled via the --enable-etnaviv
+and --disable-etnaviv configure options, otherwise support will be
+automatically detected.
+
+When building Etnadrm support, either the configure option
+--with-etnaviv-include= or --with-etnaviv-source= needs to be provided
+so etnadrm can find the etnaviv headers, similar to the Etnaviv support
+option above.  The etnaviv library does not need to be configured,
+built or installed.  Etnadrm support can be explicitly enabled or
+disabled via the --enable-etnadrm and --disable-etnadrm configure
+options, otherwise support will be automatically detected.
 
 The following packages are required by this driver:
 
 - libdrm-armada   git://git.armlinux.org.uk/~rmk/libdrm-armada.git/
 
-The following packages are optional, but may be required for certain
-features:
+The following packages are optional, but are required for building
+etnaviv and etnadrm:
 
 - etnaviv         https://github.com/laanwj/etna_viv.git
 
@@ -51,8 +71,12 @@ What operations are accelerated?
 - Xrender glyph caching, and rendering of glyphs - etnaviv only.
 - Xv textured adapter - etnaviv only.
 
-Rough build instructions
-------------------------
+Common build instructions
+-------------------------
+
+These instructions give the exact build procedure for building
+xf86-video-armada to support the etnadrm GPU driver without the etnaviv
+and vivante GPU drivers.  This is what most people will require:
 
 $ git clone git://git.armlinux.org.uk/~rmk/libdrm-armada.git/
 $ cd libdrm-armada
@@ -71,4 +95,13 @@ $ make
 $ make install
 $ cp conf/xorg-sample.conf /etc/X11/xorg.conf
 
-Now edit xorg.conf according to your needs (eg, setting XvPreferOverlay).
+You will need to edit xorg.conf according to your needs (eg, setting
+XvPreferOverlay).
+
+The commands above:
+- Download libdrm-armada
+- Configure, build and install libdrm-armada
+- Download etna_viv
+- Download xf86-video-armada
+- Configure, build and install xf86-video-armada
+- install the sample xorg.conf
