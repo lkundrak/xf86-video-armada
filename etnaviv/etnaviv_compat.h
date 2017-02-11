@@ -7,6 +7,11 @@
 #ifndef ETNAVIV_COMPAT_H
 #define ETNAVIV_COMPAT_H
 
+#include <stdint.h>
+
+struct etna_bo;
+struct viv_conn;
+
 /*
  * Etnaviv itself does not provide these functions.  We'd like these
  * to be named this way, but some incompatible etnaviv functions clash.

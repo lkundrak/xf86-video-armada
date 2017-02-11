@@ -9,8 +9,6 @@
 
 #include "utils.h"
 
-#include <etnaviv/viv.h>
-
 struct etnaviv;
 struct etnaviv_pixmap;
 
