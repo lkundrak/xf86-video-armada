@@ -155,8 +155,24 @@ AS_IF([test x$ACCEL_ETNAVIV != xno || test x$ACCEL_ETNADRM != xno],
       [
    AS_IF([test x$etnaviv_source != x],
          [
-           ETNAVIV_CFLAGS="-I$etnaviv_source/src"
-           ETNAVIV_LIBS="-L$etnaviv_source/src/etnaviv"
+      AC_MSG_CHECKING([location of etnaviv hardware headers])
+      AS_IF([test -f "$etnaviv_source/src/etnaviv/common.xml.h"],
+            [libetnaviv_includes="$etnaviv_source/src"],
+            [AC_MSG_ERROR([Could not find libetnaviv hardware headers])])
+      AC_MSG_RESULT([$libetnaviv_includes])
+      AC_MSG_CHECKING([location of libetnaviv source tree])
+      AS_IF([test -f "$etnaviv_source/src/etnaviv/etna.h"],
+            [libetnaviv_source="$etnaviv_source/src"],
+            [
+         AS_IF([test -f "$etnaviv_source/attic/etnaviv/etna.h"],
+               [libetnaviv_source="$etnaviv_source/attic"],
+               [
+                  AC_MSG_ERROR([Could not find libetnaviv source within $etnaviv_source])
+               ])
+            ])
+      ETNAVIV_CFLAGS="-I$libetnaviv_source -I$libetnaviv_includes"
+      ETNAVIV_LIBS="-L$libetnaviv_source/etnaviv"
+      AC_MSG_RESULT([$libetnaviv_source])
          ],
          [
            AS_IF([test x$etnaviv_include = x],
