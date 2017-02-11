@@ -21,7 +21,6 @@
 #include "xf86.h"
 
 #include <armada_bufmgr.h>
-#include <etnaviv/state_2d.xml.h>
 #include "cpu_access.h"
 #include "gal_extension.h"
 #include "pamdump.h"
@@ -29,6 +28,8 @@
 
 #include "etnaviv_accel.h"
 #include "etnaviv_utils.h"
+
+#include <etnaviv/state_2d.xml.h>
 #include "etnaviv_compat.h"
 
 static const char *etnaviv_errors[] = {

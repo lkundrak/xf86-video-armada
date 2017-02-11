@@ -23,6 +23,7 @@ ETNA_COMMON_SOURCES = \
 	etnaviv_accel.c \
 	etnaviv_accel.h \
 	etnaviv_compat.h \
+	etnaviv_compat_xorg.h \
 	etnaviv_op.c \
 	etnaviv_op.h \
 	etnaviv_render.c \

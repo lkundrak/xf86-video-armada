@@ -10,18 +10,18 @@
 #include <sys/mman.h>
 #include <xf86.h>
 #include <xf86drm.h>
-#include <etnaviv/viv.h>
-#include <etnaviv/etna.h>
-#include <etnaviv/etna_bo.h>
-
-#include <etnaviv/state.xml.h>
 
 #include "bo-cache.h"
 #include "etnadrm.h"
 #include "etnaviv_drm.h"
-#include "etnaviv_compat.h"
 #include "compat-list.h"
 #include "utils.h"
+
+#include <etnaviv/viv.h>
+#include <etnaviv/etna.h>
+#include <etnaviv/etna_bo.h>
+#include <etnaviv/state.xml.h>
+#include "etnaviv_compat.h"
 
 struct etna_viv_conn {
 	struct viv_conn conn;

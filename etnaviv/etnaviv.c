@@ -28,9 +28,6 @@
 #include "xf86.h"
 #include "compat-api.h"
 
-#include <etnaviv/etna.h>
-#include <etnaviv/state_2d.xml.h>
-
 #include "cpu_access.h"
 #include "fbutil.h"
 #include "gal_extension.h"
@@ -44,6 +41,10 @@
 #include "etnaviv_render.h"
 #include "etnaviv_utils.h"
 #include "etnaviv_xv.h"
+
+#include <etnaviv/etna.h>
+#include <etnaviv/state_2d.xml.h>
+#include "etnaviv_compat.h"
 
 etnaviv_Key etnaviv_pixmap_index;
 etnaviv_Key etnaviv_screen_index;

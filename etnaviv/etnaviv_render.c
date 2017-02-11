@@ -14,8 +14,6 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include <etnaviv/state_2d.xml.h>
-
 #ifdef HAVE_DIX_CONFIG_H
 #include "dix-config.h"
 #endif
@@ -38,6 +36,8 @@
 #include "etnaviv_accel.h"
 #include "etnaviv_render.h"
 #include "etnaviv_utils.h"
+
+#include <etnaviv/state_2d.xml.h>
 #include "etnaviv_compat.h"
 
 struct etnaviv_composite_state {

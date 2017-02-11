@@ -7,13 +7,14 @@
 #ifndef VIVANTE_ACCEL_H
 #define VIVANTE_ACCEL_H
 
+#include "compat-list.h"
+#include "pixmaputil.h"
+#include "etnaviv_op.h"
+#include "etnaviv_compat_xorg.h"
+
 #include <etnaviv/viv.h>
 #include <etnaviv/etna.h>
 #include <etnaviv/etna_bo.h>
-#include "compat-list.h"
-#include "pixmaputil.h"
-#include "etnaviv_compat.h"
-#include "etnaviv_op.h"
 
 struct armada_accel_ops;
 struct drm_armada_bo;

@@ -37,8 +37,9 @@
 #include "etnaviv_utils.h"
 #include "etnaviv_xv.h"
 
-#include "etnaviv/etna_bo.h"
-#include "etnaviv/state_2d.xml.h"
+#include <etnaviv/etna_bo.h>
+#include <etnaviv/state_2d.xml.h>
+#include "etnaviv_compat.h"
 
 /*
  * The Vivante GPU supports up to 32k x 32k, but that would be
