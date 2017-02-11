@@ -1,0 +1,52 @@
+FAQ for xf86-video-armada
+=========================
+
+Q1. Why does xf86-video-armada Etnadrm backend require etna_viv's
+    (aka libetnaviv) include files?
+
+A1. xf86-video-armada's etnaviv backend is shared between the libetnaviv
+    and etnadrm drivers.  The structure of these drivers is:
+
+    Xorg -> etnaviv front end -> gpu command stream -> kernel interface
+
+    The front end is common between etnadrm and etnaviv GPU drivers,
+    and shares datastructures and function names with libetnaviv.  This
+    means that both GPU drivers generate indentical GPU command streams
+    for the same Xorg operations.
+
+    The only parts that differ between the two backends is the kernel
+    interface, which is responsible for submitting the command stream to
+    the kernel, waiting for completion of these streams, and providing
+    GPU buffer memory management.
+
+    For etnaviv, we use the libetnaviv library, which requires certain
+    structures to be used not only at the kernel interface level, but
+    throughout the driver.
+
+    For etnadrm, we use our own kernel interface which is binary
+    compatible with libetnaviv.  Hence, libetnaviv headers are required
+    when building etnadrm to maintain binary compatibility with
+    libetnaviv.
+
+    The alternative would be to maintain and build three entirely
+    separate GPU backends - which is not desirable.  Having common code
+    which generates exactly the same command stream means that when a
+    bug is found, we can compare the behaviour of the DRM kernel
+    support with Vivante's kernel support.
+
+Q2. Do I need to build etna_viv (aka, libetnaviv) to build the etnadrm
+    backend?
+
+A2. No, it should not be necessary to build etna_viv or configure it
+    when building only the etnadrm GPU backend.  xf86-video-armada only
+    requires the libetnaviv include files in this case.  At the time of
+    writing, these are:
+
+      etnaviv/cmdstream.xml.h
+      etnaviv/common.xml.h
+      etnaviv/etna.h
+      etnaviv/etna_bo.h
+      etnaviv/etna_util.h
+      etnaviv/state.xml.h
+      etnaviv/state_2d.xml.h
+      etnaviv/viv.h
