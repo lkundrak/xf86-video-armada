@@ -13,12 +13,14 @@
 #include "etnaviv_compat_xorg.h"
 
 #include <etnaviv/viv.h>
-#include <etnaviv/etna_bo.h>
 
 struct armada_accel_ops;
 struct drm_armada_bo;
 struct drm_armada_bufmgr;
 struct etnaviv_dri2_info;
+
+/* From libetnaviv */
+struct etna_bo;
 
 #undef DEBUG
 

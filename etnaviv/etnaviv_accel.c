@@ -35,6 +35,7 @@
 #include "etnaviv_utils.h"
 
 #include <etnaviv/etna.h>
+#include <etnaviv/etna_bo.h>
 #include <etnaviv/state.xml.h>
 #include <etnaviv/state_2d.xml.h>
 #include "etnaviv_compat.h"

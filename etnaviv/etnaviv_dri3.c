@@ -29,6 +29,7 @@
 #include "etnaviv_accel.h"
 #include "etnaviv_dri3.h"
 
+#include <etnaviv/etna_bo.h>
 #include "etnaviv_compat.h"
 
 static Bool etnaviv_dri3_authorise(struct etnaviv *etnaviv, int fd)
