@@ -89,6 +89,7 @@ $ git clone https://github.com/laanwj/etna_viv.git
 $ ETNA_SRC=$PWD/etna_viv
 $ git clone git://git.armlinux.org.uk/~rmk/xf86-video-armada.git/
 $ cd xf86-video-armada
+$ git checkout unstable-devel
 $ ./autogen.sh --prefix=/usr --disable-vivante --disable-etnaviv \
   --with-etnaviv-source=$ETNA_SRC
 $ make
