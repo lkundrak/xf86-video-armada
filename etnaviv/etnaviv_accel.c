@@ -77,6 +77,8 @@ void etnaviv_batch_wait_commit(struct etnaviv *etnaviv,
 static void etnaviv_batch_add(struct etnaviv *etnaviv,
 	struct etnaviv_pixmap *vPix)
 {
+	if (vPix->batch_state == B_NONE)
+		vPix->refcnt++;
 	switch (vPix->batch_state) {
 	case B_PENDING:
 		break;

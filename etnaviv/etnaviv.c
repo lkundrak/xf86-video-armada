@@ -99,6 +99,7 @@ void etnaviv_retire_vpix(struct etnaviv *etnaviv, struct etnaviv_pixmap *vpix)
 {
 	xorg_list_del(&vpix->batch_node);
 	vpix->batch_state = B_NONE;
+	etnaviv_put_vpix(etnaviv, vpix);
 }
 
 void etnaviv_finish_fences(struct etnaviv *etnaviv, uint32_t fence)
