@@ -76,6 +76,13 @@ static void etnaviv_free_vpix(struct etnaviv *etnaviv,
 	free(vPix);
 }
 
+static void etnaviv_put_vpix(struct etnaviv *etnaviv,
+	struct etnaviv_pixmap *vPix)
+{
+	if (--vPix->refcnt == 0)
+		etnaviv_free_vpix(etnaviv, vPix);
+}
+
 void etnaviv_free_busy_vpix(struct etnaviv *etnaviv)
 {
 	struct etnaviv_pixmap *i, *n;
@@ -83,7 +90,7 @@ void etnaviv_free_busy_vpix(struct etnaviv *etnaviv)
 	xorg_list_for_each_entry_safe(i, n, &etnaviv->busy_free_list, busy_node) {
 		if (i->batch_state == B_NONE) {
 			xorg_list_del(&i->busy_node);
-			etnaviv_free_vpix(etnaviv, i);
+			etnaviv_put_vpix(etnaviv, i);
 		}
 	}
 }
@@ -158,7 +165,7 @@ static void etnaviv_free_pixmap(PixmapPtr pixmap)
 			 * the GPU but we have already seen a commit+stall.
 			 * We can just free this pixmap.
 			 */
-			etnaviv_free_vpix(etnaviv, vPix);
+			etnaviv_put_vpix(etnaviv, vPix);
 			break;
 
 		case B_FENCED:
@@ -168,7 +175,7 @@ static void etnaviv_free_pixmap(PixmapPtr pixmap)
 			 */
 			if (VIV_FENCE_BEFORE_EQ(vPix->fence, etnaviv->last_fence)) {
 				etnaviv_retire_vpix(etnaviv, vPix);
-				etnaviv_free_vpix(etnaviv, vPix);
+				etnaviv_put_vpix(etnaviv, vPix);
 				break;
 			}
 
@@ -209,6 +216,7 @@ static struct etnaviv_pixmap *etnaviv_alloc_pixmap(PixmapPtr pixmap,
 		vpix->height = pixmap->drawable.height;
 		vpix->pitch = pixmap->devKind;
 		vpix->format = fmt;
+		vpix->refcnt = 1;
 	}
 	return vpix;
 }

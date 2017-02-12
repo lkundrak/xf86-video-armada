@@ -171,6 +171,7 @@ struct etnaviv_pixmap {
 	struct drm_armada_bo *bo;
 	struct etna_bo *etna_bo;
 	uint32_t name;
+	unsigned int refcnt;
 };
 
 struct etnaviv_usermem_node {
