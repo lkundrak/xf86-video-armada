@@ -61,28 +61,6 @@ const OptionInfoRec etnaviv_options[] = {
 	{ -1,			NULL,		OPTV_NONE,    {0}, FALSE }
 };
 
-static void etnaviv_free_vpix(struct etnaviv *etnaviv,
-	struct etnaviv_pixmap *vPix)
-{
-	if (vPix->etna_bo) {
-		struct etna_bo *etna_bo = vPix->etna_bo;
-
-		if (!vPix->bo && vPix->state & ST_CPU_RW)
-			etna_bo_cpu_fini(etna_bo);
-		etna_bo_del(etnaviv->conn, etna_bo, NULL);
-	}
-	if (vPix->bo)
-		drm_armada_bo_put(vPix->bo);
-	free(vPix);
-}
-
-static void etnaviv_put_vpix(struct etnaviv *etnaviv,
-	struct etnaviv_pixmap *vPix)
-{
-	if (--vPix->refcnt == 0)
-		etnaviv_free_vpix(etnaviv, vPix);
-}
-
 void etnaviv_finish_fences(struct etnaviv *etnaviv, uint32_t fence)
 {
 	uint32_t last;
@@ -125,26 +103,6 @@ static CARD32 etnaviv_cache_expire(OsTimerPtr timer, CARD32 time, pointer arg)
 	return 0;
 }
 
-static void etnaviv_free_pixmap(PixmapPtr pixmap)
-{
-	struct etnaviv_pixmap *vPix = etnaviv_get_pixmap_priv(pixmap);
-
-	if (vPix) {
-		struct etnaviv *etnaviv;
-
-		etnaviv_set_pixmap_priv(pixmap, NULL);
-
-		etnaviv = etnaviv_get_screen_priv(pixmap->drawable.pScreen);
-
-		/*
-		 * Put the pixmap - if it's on one of the batch or fence
-		 * lists, they will hold a refcount, which will be dropped
-		 * once the GPU operation is complete.
-		 */
-		etnaviv_put_vpix(etnaviv, vPix);
-	}
-}
-
 /*
  * We are about to respond to a client.  Ensure that all pending rendering
  * is flushed to the GPU prior to the response being delivered.
@@ -157,6 +115,24 @@ static void etnaviv_flush_callback(CallbackListPtr *list, pointer user_data,
 
 	if (pScrn->vtSema && etnaviv_fence_batch_pending(&etnaviv->fence_head))
 		etnaviv_commit(etnaviv, FALSE);
+}
+
+/* Etnaviv pixmap memory management */
+static void etnaviv_put_vpix(struct etnaviv *etnaviv,
+	struct etnaviv_pixmap *vPix)
+{
+	if (--vPix->refcnt == 0) {
+		if (vPix->etna_bo) {
+			struct etna_bo *etna_bo = vPix->etna_bo;
+
+			if (!vPix->bo && vPix->state & ST_CPU_RW)
+				etna_bo_cpu_fini(etna_bo);
+			etna_bo_del(etnaviv->conn, etna_bo, NULL);
+		}
+		if (vPix->bo)
+			drm_armada_bo_put(vPix->bo);
+		free(vPix);
+	}
 }
 
 static void etnaviv_retire_vpix_fence(struct etnaviv_fence_head *fh,
@@ -184,6 +160,26 @@ static struct etnaviv_pixmap *etnaviv_alloc_pixmap(PixmapPtr pixmap,
 		vpix->fence.retire = etnaviv_retire_vpix_fence;
 	}
 	return vpix;
+}
+
+static void etnaviv_free_pixmap(PixmapPtr pixmap)
+{
+	struct etnaviv_pixmap *vPix = etnaviv_get_pixmap_priv(pixmap);
+
+	if (vPix) {
+		struct etnaviv *etnaviv;
+
+		etnaviv_set_pixmap_priv(pixmap, NULL);
+
+		etnaviv = etnaviv_get_screen_priv(pixmap->drawable.pScreen);
+
+		/*
+		 * Put the pixmap - if it's on one of the batch or fence
+		 * lists, they will hold a refcount, which will be dropped
+		 * once the GPU operation is complete.
+		 */
+		etnaviv_put_vpix(etnaviv, vPix);
+	}
 }
 
 
