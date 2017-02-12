@@ -1247,8 +1247,6 @@ static void etnaviv_accel_glyph_upload(ScreenPtr pScreen, PicturePtr pDst,
 			return;
 		}
 
-		/* vdst will not go away while the server is running */
-		unode->dst = vdst;
 		unode->bo = usr;
 		unode->mem = b;
 

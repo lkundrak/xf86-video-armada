@@ -101,27 +101,23 @@ void etnaviv_finish_fences(struct etnaviv *etnaviv, uint32_t fence)
 	etnaviv->last_fence = fence;
 }
 
+static void etnaviv_retire_freemem_fence(struct etnaviv_fence_head *fh,
+	struct etnaviv_fence *f)
+{
+	struct etnaviv *etnaviv = container_of(fh, struct etnaviv, fence_head);
+	struct etnaviv_usermem_node *n = container_of(f,
+					struct etnaviv_usermem_node, fence);
+
+	etna_bo_del(etnaviv->conn, n->bo, NULL);
+	free(n->mem);
+	free(n);
+}
+
 void etnaviv_add_freemem(struct etnaviv *etnaviv,
 	struct etnaviv_usermem_node *n)
 {
-	xorg_list_append(&n->node, &etnaviv->usermem_free_list);
-}
-
-static void etnaviv_free_usermem(struct etnaviv *etnaviv)
-{
-	struct etnaviv_usermem_node *i, *n;
-
-	/*
-	 * This is really a hack - we should have proper APIs, but as long
-	 * as we support etnaviv alongside etnadrm, we have no option.
-	 */
-	xorg_list_for_each_entry_safe(i, n, &etnaviv->usermem_free_list, node) {
-		xorg_list_del(&i->node);
-		etnaviv_batch_wait_commit(etnaviv, i->dst);
-		etna_bo_del(etnaviv->conn, i->bo, NULL);
-		free(i->mem);
-		free(i);
-	}
+	n->fence.retire = etnaviv_retire_freemem_fence;
+	etnaviv_fence_add(&etnaviv->fence_head, &n->fence);
 }
 
 static CARD32 etnaviv_cache_expire(OsTimerPtr timer, CARD32 time, pointer arg)
@@ -825,12 +821,6 @@ static void etnaviv_BlockHandler(BLOCKHANDLER_ARGS_DECL)
 							etnaviv);
 		}
 	}
-
-	/*
-	 * Try to free any usermem buffers
-	 */
-	if (!xorg_list_is_empty(&etnaviv->usermem_free_list))
-		etnaviv_free_usermem(etnaviv);
 }
 
 static Bool etnaviv_pre_init(ScrnInfoPtr pScrn, int drm_fd)
@@ -892,7 +882,6 @@ static Bool etnaviv_ScreenInit(ScreenPtr pScreen, struct drm_armada_bufmgr *mgr)
 		goto fail_accel;
 
 	etnaviv_fence_head_init(&etnaviv->fence_head);
-	xorg_list_init(&etnaviv->usermem_free_list);
 
 	etnaviv_set_screen_priv(pScreen, etnaviv);
 

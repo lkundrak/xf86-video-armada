@@ -80,7 +80,6 @@ struct etnaviv {
 	struct viv_conn *conn;
 	struct etna_ctx *ctx;
 	struct etnaviv_fence_head fence_head;
-	struct xorg_list usermem_free_list;
 	OsTimerPtr cache_timer;
 	uint32_t last_fence;
 	Bool force_fallback;
@@ -165,8 +164,7 @@ struct etnaviv_pixmap {
 };
 
 struct etnaviv_usermem_node {
-	struct xorg_list node;
-	struct etnaviv_pixmap *dst;
+	struct etnaviv_fence fence;
 	struct etna_bo *bo;
 	void *mem;
 };
