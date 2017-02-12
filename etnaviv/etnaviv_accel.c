@@ -227,7 +227,6 @@ void etnaviv_commit(struct etnaviv *etnaviv, Bool stall, uint32_t *fence)
 		 */
 		etnaviv->last_fence = *fence;
 		etnaviv_finish_fences(etnaviv, *fence);
-		etnaviv_free_busy_vpix(etnaviv);
 	} else if (fence) {
 		uint32_t fence_val = *fence;
 
@@ -1074,8 +1073,6 @@ void etnaviv_accel_shutdown(struct etnaviv *etnaviv)
 	xorg_list_for_each_entry_safe(i, n, &etnaviv->fence_head,
 				      batch_node)
 		etnaviv_retire_vpix(etnaviv, i);
-
-	etnaviv_free_busy_vpix(etnaviv);
 
 	if (etnaviv->gc320_etna_bo)
 		etna_bo_del(etnaviv->conn, etnaviv->gc320_etna_bo, NULL);
