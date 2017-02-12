@@ -212,7 +212,7 @@ Bool etnaviv_accel_PolyFillRectSolid(DrawablePtr pDrawable, GCPtr pGC, int n,
 Bool etnaviv_accel_PolyFillRectTiled(DrawablePtr pDrawable, GCPtr pGC, int n,
 	xRectangle * prect);
 
-void etnaviv_commit(struct etnaviv *etnaviv, Bool stall, uint32_t *fence);
+void etnaviv_commit(struct etnaviv *etnaviv, Bool stall);
 void etnaviv_finish_fences(struct etnaviv *etnaviv, uint32_t fence);
 
 void etnaviv_batch_wait_commit(struct etnaviv *etnaviv, struct etnaviv_pixmap *vPix);

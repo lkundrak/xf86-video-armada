@@ -51,7 +51,7 @@ void etnaviv_batch_wait_commit(struct etnaviv *etnaviv,
 		return;
 
 	case B_PENDING:
-		etnaviv_commit(etnaviv, TRUE, NULL);
+		etnaviv_commit(etnaviv, TRUE);
 		break;
 
 	case B_FENCED:
@@ -176,23 +176,20 @@ static Bool etnaviv_init_src_pixmap(struct etnaviv *etnaviv,
 	return TRUE;
 }
 
-void etnaviv_commit(struct etnaviv *etnaviv, Bool stall, uint32_t *fence)
+void etnaviv_commit(struct etnaviv *etnaviv, Bool stall)
 {
 	struct etna_ctx *ctx = etnaviv->ctx;
-	uint32_t tmp_fence;
+	uint32_t fence;
 	int ret;
 
-	if (!fence && stall)
-		fence = &tmp_fence;
-
-	ret = etna_flush(ctx, fence);
+	ret = etna_flush(ctx, &fence);
 	if (ret) {
 		etnaviv_error(etnaviv, "etna_flush", ret);
 		return;
 	}
 
 	if (stall) {
-		ret = viv_fence_finish(etnaviv->conn, *fence,
+		ret = viv_fence_finish(etnaviv->conn, fence,
 				       VIV_WAIT_INDEFINITE);
 		if (ret != VIV_STATUS_OK)
 			etnaviv_error(etnaviv, "fence finish", ret);
@@ -205,14 +202,14 @@ void etnaviv_commit(struct etnaviv *etnaviv, Bool stall, uint32_t *fence)
 		etnaviv_fence_retire_all(&etnaviv->fence_head);
 
 		/* Record the completed fence ID */
-		etnaviv->last_fence = *fence;
-	} else if (fence) {
+		etnaviv->last_fence = fence;
+	} else {
 		/*
 		 * After these operations have been committed, we assign
 		 * a fence to them, and place them on the ordered list
 		 * of fenced pixmaps.
 		 */
-		etnaviv_fence_objects(&etnaviv->fence_head, *fence);
+		etnaviv_fence_objects(&etnaviv->fence_head, fence);
 	}
 }
 

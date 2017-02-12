@@ -154,10 +154,9 @@ static void etnaviv_flush_callback(CallbackListPtr *list, pointer user_data,
 {
 	ScrnInfoPtr pScrn = user_data;
 	struct etnaviv *etnaviv = pScrn->privates[etnaviv_private_index].ptr;
-	uint32_t fence;
 
 	if (pScrn->vtSema && etnaviv_fence_batch_pending(&etnaviv->fence_head))
-		etnaviv_commit(etnaviv, FALSE, &fence);
+		etnaviv_commit(etnaviv, FALSE);
 }
 
 static void etnaviv_retire_vpix_fence(struct etnaviv_fence_head *fh,
@@ -484,7 +483,7 @@ static Bool etnaviv_CloseScreen(CLOSE_SCREEN_ARGS_DECL)
 #endif
 
 	/* Ensure everything has been committed */
-	etnaviv_commit(etnaviv, TRUE, NULL);
+	etnaviv_commit(etnaviv, TRUE);
 
 	pixmap = pScreen->GetScreenPixmap(pScreen);
 	etnaviv_free_pixmap(pixmap);
@@ -793,10 +792,9 @@ static void etnaviv_BlockHandler(BLOCKHANDLER_ARGS_DECL)
 {
 	SCREEN_PTR(arg);
 	struct etnaviv *etnaviv = etnaviv_get_screen_priv(pScreen);
-	uint32_t fence;
 
 	if (etnaviv_fence_batch_pending(&etnaviv->fence_head))
-		etnaviv_commit(etnaviv, FALSE, &fence);
+		etnaviv_commit(etnaviv, FALSE);
 
 	mark_flush();
 
