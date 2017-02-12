@@ -56,8 +56,7 @@ void etnaviv_batch_wait_commit(struct etnaviv *etnaviv,
 	case B_FENCED:
 		if (VIV_FENCE_BEFORE_EQ(vPix->fence, etnaviv->last_fence)) {
 			/* The pixmap has already completed. */
-			xorg_list_del(&vPix->batch_node);
-			vPix->batch_state = B_NONE;
+			etnaviv_retire_vpix(etnaviv, vPix);
 			break;
 		}
 
@@ -217,10 +216,8 @@ void etnaviv_commit(struct etnaviv *etnaviv, Bool stall, uint32_t *fence)
 		 * the GPU.
 		 */
 		xorg_list_for_each_entry_safe(i, n, &etnaviv->batch_head,
-					      batch_node) {
-			xorg_list_del(&i->batch_node);
-			i->batch_state = B_NONE;
-		}
+					      batch_node)
+			etnaviv_retire_vpix(etnaviv, i);
 
 		/*
 		 * Reap the previously submitted pixmaps, now that we know
@@ -1069,15 +1066,13 @@ void etnaviv_accel_shutdown(struct etnaviv *etnaviv)
 	TimerFree(etnaviv->cache_timer);
 	etna_finish(etnaviv->ctx);
 	xorg_list_for_each_entry_safe(i, n, &etnaviv->batch_head,
-				      batch_node) {
-		xorg_list_del(&i->batch_node);
-		i->batch_state = B_NONE;
-	}
+				      batch_node)
+		etnaviv_retire_vpix(etnaviv, i);
+
 	xorg_list_for_each_entry_safe(i, n, &etnaviv->fence_head,
-				      batch_node) {
-		xorg_list_del(&i->batch_node);
-		i->batch_state = B_NONE;
-	}
+				      batch_node)
+		etnaviv_retire_vpix(etnaviv, i);
+
 	etnaviv_free_busy_vpix(etnaviv);
 
 	if (etnaviv->gc320_etna_bo)

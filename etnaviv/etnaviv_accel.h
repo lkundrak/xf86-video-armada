@@ -183,6 +183,8 @@ struct etnaviv_usermem_node {
 void etnaviv_add_freemem(struct etnaviv *etnaviv,
 	struct etnaviv_usermem_node *n);
 
+void etnaviv_retire_vpix(struct etnaviv *etnaviv, struct etnaviv_pixmap *vpix);
+
 static inline void etnaviv_enable_bugfix(struct etnaviv *etnaviv,
 	unsigned int bug)
 {

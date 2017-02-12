@@ -88,6 +88,12 @@ void etnaviv_free_busy_vpix(struct etnaviv *etnaviv)
 	}
 }
 
+void etnaviv_retire_vpix(struct etnaviv *etnaviv, struct etnaviv_pixmap *vpix)
+{
+	xorg_list_del(&vpix->batch_node);
+	vpix->batch_state = B_NONE;
+}
+
 void etnaviv_finish_fences(struct etnaviv *etnaviv, uint32_t fence)
 {
 	struct etnaviv_pixmap *i, *n;
@@ -102,8 +108,7 @@ void etnaviv_finish_fences(struct etnaviv *etnaviv, uint32_t fence)
 				break;
 			etnaviv->last_fence = fence;
 		}
-		xorg_list_del(&i->batch_node);
-		i->batch_state = B_NONE;
+		etnaviv_retire_vpix(etnaviv, i);
 	}
 }
 
@@ -162,7 +167,7 @@ static void etnaviv_free_pixmap(PixmapPtr pixmap)
 			 * operations.  Check whether it has completed.
 			 */
 			if (VIV_FENCE_BEFORE_EQ(vPix->fence, etnaviv->last_fence)) {
-				xorg_list_del(&vPix->batch_node);
+				etnaviv_retire_vpix(etnaviv, vPix);
 				etnaviv_free_vpix(etnaviv, vPix);
 				break;
 			}
