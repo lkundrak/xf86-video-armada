@@ -9,6 +9,7 @@
 
 #include "compat-list.h"
 #include "pixmaputil.h"
+#include "etnaviv_fence.h"
 #include "etnaviv_op.h"
 #include "etnaviv_compat_xorg.h"
 
@@ -78,10 +79,7 @@ enum {
 struct etnaviv {
 	struct viv_conn *conn;
 	struct etna_ctx *ctx;
-	/* pixmaps queued for next commit */
-	struct xorg_list batch_head;
-	/* pixmaps committed with fence id, ordered by id */
-	struct xorg_list fence_head;
+	struct etnaviv_fence_head fence_head;
 	struct xorg_list usermem_free_list;
 	OsTimerPtr cache_timer;
 	uint32_t last_fence;
@@ -145,14 +143,8 @@ struct etnaviv_pixmap {
 	unsigned pitch;
 	struct etnaviv_format format;
 	struct etnaviv_format pict_format;
-	struct xorg_list batch_node;
-	uint32_t fence;
+	struct etnaviv_fence fence;
 	viv_usermem_t info;
-
-	uint8_t batch_state;
-#define B_NONE		0
-#define B_PENDING	1
-#define B_FENCED	2
 
 	uint8_t state;
 #define ST_CPU_R	(1 << 0)
@@ -181,8 +173,6 @@ struct etnaviv_usermem_node {
 
 void etnaviv_add_freemem(struct etnaviv *etnaviv,
 	struct etnaviv_usermem_node *n);
-
-void etnaviv_retire_vpix(struct etnaviv *etnaviv, struct etnaviv_pixmap *vpix);
 
 static inline void etnaviv_enable_bugfix(struct etnaviv *etnaviv,
 	unsigned int bug)
