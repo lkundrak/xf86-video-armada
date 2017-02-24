@@ -51,6 +51,11 @@ static const char *armada_drm_property_names[NR_DRM_PROPS] = {
 	[PROP_DRM_COLORKEY] = "colorkey",
 };
 
+struct drm_xv_prop {
+	drmModePropertyPtr prop;
+	uint64_t value;
+};
+
 struct drm_xv {
 	int fd;
 	struct drm_armada_bufmgr *bufmgr;
@@ -88,8 +93,7 @@ struct drm_xv {
 	uint32_t plane_fb_id;
 	drmModePlanePtr plane;
 	drmModePlanePtr planes[2];
-	drmModePropertyPtr props[NR_DRM_PROPS];
-	uint64_t prop_values[NR_DRM_PROPS];
+	struct drm_xv_prop props[NR_DRM_PROPS];
 };
 
 enum {
@@ -112,15 +116,15 @@ static int armada_drm_prop_set(ScrnInfoPtr pScrn,
 	const struct xv_attr_data *attr, INT32 value, pointer data)
 {
 	struct drm_xv *drmxv = data;
+	struct drm_xv_prop *prop = &drmxv->props[attr->id];
 	uint32_t prop_id;
 	unsigned i;
 
-	if (drmxv->props[attr->id] == NULL)
+	if (!prop->prop)
 		return Success; /* Actually BadMatch... */
 
-	drmxv->prop_values[attr->id] = value;
-
-	prop_id = drmxv->props[attr->id]->prop_id;
+	prop->value = value;
+	prop_id = prop->prop->prop_id;
 
 	for (i = 0; i < ARRAY_SIZE(drmxv->planes); i++) {
 		if (!drmxv->planes[i])
@@ -138,7 +142,7 @@ static int armada_drm_prop_get(ScrnInfoPtr pScrn,
 	const struct xv_attr_data *attr, INT32 *value, pointer data)
 {
 	struct drm_xv *drmxv = data;
-	*value = drmxv->prop_values[attr->id];
+	*value = drmxv->props[attr->id].value;
 	return Success;
 }
 
@@ -882,7 +886,7 @@ armada_drm_plane_Put(ScrnInfoPtr pScrn, struct drm_xv *drmxv, uint32_t fb_id,
 	    !RegionEqual(&drmxv->clipBoxes, clipBoxes)) {
 		RegionCopy(&drmxv->clipBoxes, clipBoxes);
 		xf86XVFillKeyHelper(pScrn->pScreen,
-				    drmxv->prop_values[PROP_DRM_COLORKEY],
+				    drmxv->props[PROP_DRM_COLORKEY].value,
 				    clipBoxes);
 	}
 
@@ -1143,12 +1147,12 @@ Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 
 			for (k = 0; k < NR_DRM_PROPS; k++) {
 				const char *name = armada_drm_property_names[k];
-				if (drmxv->props[k])
+				if (drmxv->props[k].prop)
 					continue;
 
 				if (strcmp(prop->name, name) == 0) {
-					drmxv->props[k] = prop;
-					drmxv->prop_values[k] = props->prop_values[j];
+					drmxv->props[k].prop = prop;
+					drmxv->props[k].value = props->prop_values[j];
 					prop = NULL;
 					break;
 				}
