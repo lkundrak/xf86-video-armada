@@ -1080,6 +1080,23 @@ static struct drm_armada_bo *armada_drm_import_accel_name(ScrnInfoPtr pScrn,
 	return bo;
 }
 
+static void armada_drm_property_setup(struct drm_xv *drmxv,
+	drmModePropertyPtr prop, uint64_t value)
+{
+	unsigned int i;
+
+	for (i = 0; i < NR_DRM_PROPS; i++) {
+		if (drmxv->props[i].prop_id)
+			continue;
+
+		if (strcmp(prop->name, armada_drm_property_names[i]) == 0) {
+			drmxv->props[i].prop_id = prop->prop_id;
+			drmxv->props[i].value = value;
+			break;
+		}
+	}
+}
+
 Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 {
 	ScreenPtr scrn = screenInfo.screens[pScrn->scrnIndex];
@@ -1139,24 +1156,13 @@ Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 
 		for (j = 0; j < props->count_props; j++) {
 			drmModePropertyPtr prop;
-			unsigned k;
 
 			prop = drmModeGetProperty(drmxv->fd, props->props[j]);
 			if (!prop)
 				continue;
 
-			for (k = 0; k < NR_DRM_PROPS; k++) {
-				const char *name = armada_drm_property_names[k];
-				if (drmxv->props[k].prop_id)
-					continue;
-
-				if (strcmp(prop->name, name) == 0) {
-					drmxv->props[k].prop_id = prop->prop_id;
-					drmxv->props[k].value = props->prop_values[j];
-					break;
-				}
-			}
-
+			armada_drm_property_setup(drmxv, prop,
+						  props->prop_values[j]);
 			drmModeFreeProperty(prop);
 		}
 		drmModeFreeObjectProperties(props);
