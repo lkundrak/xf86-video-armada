@@ -1108,13 +1108,60 @@ static void armada_drm_property_setup(struct drm_xv *drmxv,
 	}
 }
 
+static Bool armada_drm_gather_planes(ScrnInfoPtr pScrn, struct drm_xv *drmxv)
+{
+	drmModePlaneResPtr res;
+	unsigned int i;
+	Bool ret = FALSE;
+
+	/* Get the plane resources and the overlay planes */
+	res = drmModeGetPlaneResources(drmxv->fd);
+	if (!res)
+		goto err;
+
+	/* Get all plane information */
+	for (i = 0; i < res->count_planes && i < ARRAY_SIZE(drmxv->planes); i++) {
+		drmModeObjectPropertiesPtr props;
+		uint32_t plane_id = res->planes[i];
+		unsigned j;
+
+		drmxv->planes[i] = drmModeGetPlane(drmxv->fd, plane_id);
+		props = drmModeObjectGetProperties(drmxv->fd, plane_id,
+						   DRM_MODE_OBJECT_PLANE);
+		if (!drmxv->planes[i] || !props)
+			goto err;
+
+		for (j = 0; j < props->count_props; j++) {
+			drmModePropertyPtr prop;
+
+			prop = drmModeGetProperty(drmxv->fd, props->props[j]);
+			if (!prop)
+				continue;
+
+			armada_drm_property_setup(drmxv, prop,
+						  props->prop_values[j]);
+			drmModeFreeProperty(prop);
+		}
+		drmModeFreeObjectProperties(props);
+	}
+
+	ret = TRUE;
+
+err:
+	if (res) {
+		/* Done with the plane resources */
+		drmModeFreePlaneResources(res);
+	}
+
+	return ret;
+}
+
 Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 {
 	ScreenPtr scrn = screenInfo.screens[pScrn->scrnIndex];
 	struct common_drm_info *drm = GET_DRM_INFO(pScrn);
 	struct armada_drm_info *arm = GET_ARMADA_DRM_INFO(pScrn);
 	XF86VideoAdaptorPtr xv[2], plane, gpu_adap;
-	drmModePlaneResPtr res;
 	struct drm_xv *drmxv;
 	DevUnion priv[1];
 	unsigned i, num, cap = 0;
@@ -1146,41 +1193,8 @@ Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 	drmxv->bufmgr = arm->bufmgr;
 	drmxv->autopaint_colorkey = TRUE;
 
-	/* Get the plane resources and the overlay planes */
-	res = drmModeGetPlaneResources(drmxv->fd);
-	if (!res)
+	if (!armada_drm_gather_planes(pScrn, drmxv))
 		goto err_free;
-
-	/* Get all plane information */
-	for (i = 0; i < res->count_planes && i < ARRAY_SIZE(drmxv->planes); i++) {
-		drmModeObjectPropertiesPtr props;
-		uint32_t plane_id = res->planes[i];
-		unsigned j;
-
-		drmxv->planes[i] = drmModeGetPlane(drmxv->fd, plane_id);
-		props = drmModeObjectGetProperties(drmxv->fd, plane_id,
-						   DRM_MODE_OBJECT_PLANE);
-		if (!drmxv->planes[i] || !props) {
-			drmModeFreePlaneResources(res);
-			goto err_free;
-		}
-
-		for (j = 0; j < props->count_props; j++) {
-			drmModePropertyPtr prop;
-
-			prop = drmModeGetProperty(drmxv->fd, props->props[j]);
-			if (!prop)
-				continue;
-
-			armada_drm_property_setup(drmxv, prop,
-						  props->prop_values[j]);
-			drmModeFreeProperty(prop);
-		}
-		drmModeFreeObjectProperties(props);
-	}
-
-	/* Done with the plane resources */
-	drmModeFreePlaneResources(res);
 
 	prefer_overlay = xf86ReturnOptValBool(arm->Options,
 					      OPTION_XV_PREFEROVL, TRUE);
