@@ -52,7 +52,7 @@ static const char *armada_drm_property_names[NR_DRM_PROPS] = {
 };
 
 struct drm_xv_prop {
-	drmModePropertyPtr prop;
+	uint32_t prop_id;
 	uint64_t value;
 };
 
@@ -120,11 +120,11 @@ static int armada_drm_prop_set(ScrnInfoPtr pScrn,
 	uint32_t prop_id;
 	unsigned i;
 
-	if (!prop->prop)
+	if (prop->prop_id == 0)
 		return Success; /* Actually BadMatch... */
 
 	prop->value = value;
-	prop_id = prop->prop->prop_id;
+	prop_id = prop->prop_id;
 
 	for (i = 0; i < ARRAY_SIZE(drmxv->planes); i++) {
 		if (!drmxv->planes[i])
@@ -1147,19 +1147,17 @@ Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 
 			for (k = 0; k < NR_DRM_PROPS; k++) {
 				const char *name = armada_drm_property_names[k];
-				if (drmxv->props[k].prop)
+				if (drmxv->props[k].prop_id)
 					continue;
 
 				if (strcmp(prop->name, name) == 0) {
-					drmxv->props[k].prop = prop;
+					drmxv->props[k].prop_id = prop->prop_id;
 					drmxv->props[k].value = props->prop_values[j];
-					prop = NULL;
 					break;
 				}
 			}
 
-			if (prop)
-				drmModeFreeProperty(prop);
+			drmModeFreeProperty(prop);
 		}
 		drmModeFreeObjectProperties(props);
 	}
