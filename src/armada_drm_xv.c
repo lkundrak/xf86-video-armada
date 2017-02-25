@@ -855,7 +855,7 @@ static void armada_drm_xv_draw_colorkey(ScrnInfoPtr pScrn, DrawablePtr pDraw,
 	if (drmxv->autopaint_colorkey &&
 	    (repaint || !RegionEqual(&drmxv->clipBoxes, clipBoxes))) {
 		RegionCopy(&drmxv->clipBoxes, clipBoxes);
-		xf86XVFillKeyHelper(pScrn->pScreen,
+		xf86XVFillKeyHelperDrawable(pDraw,
 				    drmxv->props[PROP_DRM_COLORKEY].value,
 				    clipBoxes);
 	}
