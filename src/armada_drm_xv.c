@@ -845,6 +845,22 @@ static Bool armada_drm_check_plane(ScrnInfoPtr pScrn, struct drm_xv *drmxv,
 	return TRUE;
 }
 
+/*
+ * Fill the clip boxes after we've done the ioctl so we don't impact on
+ * latency.
+ */
+static void armada_drm_xv_draw_colorkey(ScrnInfoPtr pScrn, DrawablePtr pDraw,
+	struct drm_xv *drmxv, RegionPtr clipBoxes, Bool repaint)
+{
+	if (drmxv->autopaint_colorkey &&
+	    (repaint || !RegionEqual(&drmxv->clipBoxes, clipBoxes))) {
+		RegionCopy(&drmxv->clipBoxes, clipBoxes);
+		xf86XVFillKeyHelper(pScrn->pScreen,
+				    drmxv->props[PROP_DRM_COLORKEY].value,
+				    clipBoxes);
+	}
+}
+
 static int
 armada_drm_plane_Put(ScrnInfoPtr pScrn, struct drm_xv *drmxv, uint32_t fb_id,
 	short src_x, short src_y, short src_w, short src_h,
@@ -878,18 +894,6 @@ armada_drm_plane_Put(ScrnInfoPtr pScrn, struct drm_xv *drmxv, uint32_t fb_id,
 			crtc_x, crtc_y, dst->x2 - dst->x1, dst->y2 - dst->y1,
 			x1, y1, x2 - x1, y2 - y1);
 
-	/*
-	 * Finally, fill the clip boxes; do this after we've done the ioctl
-	 * so we don't impact on latency.
-	 */
-	if (drmxv->autopaint_colorkey &&
-	    !RegionEqual(&drmxv->clipBoxes, clipBoxes)) {
-		RegionCopy(&drmxv->clipBoxes, clipBoxes);
-		xf86XVFillKeyHelper(pScrn->pScreen,
-				    drmxv->props[PROP_DRM_COLORKEY].value,
-				    clipBoxes);
-	}
-
 	return Success;
 }
 
@@ -915,6 +919,8 @@ static int armada_drm_plane_PutImage(ScrnInfoPtr pScrn,
 				    src_x, src_y, src_w, src_h,
 				    width, height, &dst, clipBoxes);
 
+	armada_drm_xv_draw_colorkey(pScrn, pDraw, drmxv, clipBoxes, FALSE);
+
 	/* If there was a previous fb, release it. */
 	if (drmxv->is_xvbo &&
 	    drmxv->plane_fb_id && drmxv->plane_fb_id != fb_id) {
@@ -934,16 +940,21 @@ static int armada_drm_plane_ReputImage(ScrnInfoPtr pScrn,
 {
 	struct drm_xv *drmxv = data;
 	BoxRec dst;
+	int ret;
 
 	if (drmxv->plane_fb_id == 0)
 		return Success;
 
 	armada_drm_coords_to_box(&dst, drw_x, drw_y, drw_w, drw_h);
 
-	return armada_drm_plane_Put(pScrn, drmxv, drmxv->plane_fb_id,
-				    src_x, src_y, src_w, src_h,
-				    drmxv->width, drmxv->height,
-				    &dst, clipBoxes);
+	ret = armada_drm_plane_Put(pScrn, drmxv, drmxv->plane_fb_id,
+				   src_x, src_y, src_w, src_h,
+				   drmxv->width, drmxv->height,
+				   &dst, clipBoxes);
+
+	armada_drm_xv_draw_colorkey(pScrn, pDraw, drmxv, clipBoxes, TRUE);
+
+	return ret;
 }
 
 static XF86VideoAdaptorPtr
