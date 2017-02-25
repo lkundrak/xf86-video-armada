@@ -807,7 +807,7 @@ armada_drm_plane_StopVideo(ScrnInfoPtr pScrn, pointer data, Bool cleanup)
 static Bool armada_drm_check_plane(ScrnInfoPtr pScrn, struct drm_xv *drmxv,
 	xf86CrtcPtr crtc)
 {
-	drmModePlanePtr plane;
+	unsigned int i;
 	uint32_t crtc_mask;
 
 	if (!crtc) {
@@ -818,28 +818,21 @@ static Bool armada_drm_check_plane(ScrnInfoPtr pScrn, struct drm_xv *drmxv,
 
 	crtc_mask = 1 << common_crtc(crtc)->num;
 
-	plane = drmxv->overlay_plane;
-	if (plane && !(plane->possible_crtcs & crtc_mask)) {
+	if (drmxv->overlay_plane &&
+	    !(drmxv->overlay_plane->possible_crtcs & crtc_mask)) {
 		/* Moved on to a different CRTC */
 		armada_drm_plane_StopVideo(pScrn, drmxv, FALSE);
-		plane = NULL;
+		drmxv->overlay_plane = NULL;
 	}
 
-	if (!plane) {
-		unsigned i;
-
+	if (!drmxv->overlay_plane)
 		for (i = 0; i < drmxv->num_planes; i++)
-			if (drmxv->mode_planes[i]->possible_crtcs & crtc_mask)
-				plane = drmxv->mode_planes[i];
+			if (drmxv->mode_planes[i]->possible_crtcs & crtc_mask) {
+				drmxv->overlay_plane = drmxv->mode_planes[i];
+				break;
+			}
 
-		/* Our new plane */
-		drmxv->overlay_plane = plane;
-
-		if (!plane)
-			return FALSE;
-	}
-
-	return TRUE;
+	return drmxv->overlay_plane != NULL;
 }
 
 /*
