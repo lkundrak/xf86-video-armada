@@ -955,7 +955,8 @@ static int armada_drm_plane_ReputImage(ScrnInfoPtr pScrn,
 }
 
 static XF86VideoAdaptorPtr
-armada_drm_XvInitPlane(ScrnInfoPtr pScrn, DevUnion *priv, struct drm_xv *drmxv)
+armada_drm_XvInitPlane(ScrnInfoPtr pScrn, DevUnion *priv, struct drm_xv *drmxv,
+	drmModePlanePtr mode_plane)
 {
 	XF86VideoAdaptorPtr p;
 	XF86ImageRec *images;
@@ -965,15 +966,15 @@ armada_drm_XvInitPlane(ScrnInfoPtr pScrn, DevUnion *priv, struct drm_xv *drmxv)
 	if (!p)
 		return NULL;
 
-	images = calloc(drmxv->planes[0]->count_formats + 1, sizeof(*images));
+	images = calloc(mode_plane->count_formats + 1, sizeof(*images));
 	if (!images) {
 		free(p);
 		return NULL;
 	}
 
-	for (num_images = i = 0; i < drmxv->planes[0]->count_formats; i++) {
+	for (num_images = i = 0; i < mode_plane->count_formats; i++) {
 		const struct xv_image_format *fmt;
-		uint32_t id = drmxv->planes[0]->formats[i];
+		uint32_t id = mode_plane->formats[i];
 
 		if (id == 0)
 			continue;
@@ -1208,7 +1209,8 @@ Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 
 	if (drmxv->planes[0]) {
 		priv[0].ptr = drmxv;
-		plane = armada_drm_XvInitPlane(pScrn, priv, drmxv);
+		plane = armada_drm_XvInitPlane(pScrn, priv, drmxv,
+					       drmxv->planes[0]);
 		if (!plane)
 			goto err_free;
 		xv[num++] = plane;
