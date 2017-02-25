@@ -780,22 +780,28 @@ armada_drm_plane_fbid(ScrnInfoPtr pScrn, struct drm_xv *drmxv, int image,
 	return Success;
 }
 
+static void armada_drm_plane_disable(ScrnInfoPtr pScrn, struct drm_xv *drmxv,
+	drmModePlanePtr mode_plane)
+{
+	int ret;
+
+	ret = drmModeSetPlane(drmxv->fd, mode_plane->plane_id,
+			      0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0);
+	if (ret)
+		xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
+			   "[drm] unable to disable plane %u: %s\n",
+			   mode_plane->plane_id, strerror(errno));
+}
+
 static void
 armada_drm_plane_StopVideo(ScrnInfoPtr pScrn, pointer data, Bool cleanup)
 {
 	struct drm_xv *drmxv = data;
 
 	if (drmxv->overlay_plane) {
-		int ret;
-
 		RegionEmpty(&drmxv->clipBoxes);
-
-		ret = drmModeSetPlane(drmxv->fd, drmxv->overlay_plane->plane_id,
-				      0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0);
-		if (ret)
-			xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
-				   "[drm] unable to stop overlay: %s\n",
-				   strerror(errno));
+		armada_drm_plane_disable(pScrn, drmxv, drmxv->overlay_plane);
+		drmxv->overlay_plane = NULL;
 	}
 
 	if (cleanup) {
@@ -821,7 +827,7 @@ static Bool armada_drm_check_plane(ScrnInfoPtr pScrn, struct drm_xv *drmxv,
 	if (drmxv->overlay_plane &&
 	    !(drmxv->overlay_plane->possible_crtcs & crtc_mask)) {
 		/* Moved on to a different CRTC */
-		armada_drm_plane_StopVideo(pScrn, drmxv, FALSE);
+		armada_drm_plane_disable(pScrn, drmxv, drmxv->overlay_plane);
 		drmxv->overlay_plane = NULL;
 	}
 
