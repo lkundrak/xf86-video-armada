@@ -120,6 +120,18 @@ Enable or disable the X Video backend.
 .IP
 Default: enabled.
 .TP
+.BI "Option \*qXvDisablePrimary\*q \*q" boolean \*q
+Allow the X Video backend to disable the primary plane when X Video
+image is displayed at full screen.
+.IP
+.B Note:
+Some kernel drivers may not fully support this (eg, the kernel driver
+does a full modeset when restoring the primary plane, causing the
+screen to momentarily blank.)  This option should be disabled for such
+kernel drivers, or the kernel driver updated to avoid such behaviour.
+.IP
+Default: enabled.
+.TP
 .BI "Option \*qXvPreferOverlay\*q \*q" boolean \*q
 Make the hardware overlay the first XV adapter.  Disabling this option
 makes any GPU provided textured overlay the first XV adapter.

@@ -36,6 +36,7 @@
 const OptionInfoRec armada_drm_options[] = {
 	{ OPTION_XV_ACCEL,	"XvAccel",	   OPTV_BOOLEAN, {0}, FALSE },
 	{ OPTION_XV_PREFEROVL,	"XvPreferOverlay", OPTV_BOOLEAN, {0}, TRUE  },
+	{ OPTION_XV_DISPRIMARY, "XvDisablePrimary",OPTV_BOOLEAN, {0}, FALSE },
 	{ OPTION_USE_GPU,	"UseGPU",	   OPTV_BOOLEAN, {0}, FALSE },
 	{ OPTION_USE_KMS_BO,	"UseKMSBo",	   OPTV_BOOLEAN, {0}, FALSE },
 	{ OPTION_ACCEL_MODULE,	"AccelModule",	   OPTV_STRING,  {0}, FALSE },

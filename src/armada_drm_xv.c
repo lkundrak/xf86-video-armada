@@ -65,6 +65,8 @@ struct drm_xv {
 	Bool has_xvbo;
 	Bool is_xvbo;
 	Bool autopaint_colorkey;
+	Bool has_primary;
+	Bool primary_obscured;
 
 	/* Cached image information */
 	RegionRec clipBoxes;
@@ -91,9 +93,10 @@ struct drm_xv {
 	/* Plane information */
 	const struct xv_image_format *plane_format;
 	uint32_t plane_fb_id;
+	xf86CrtcPtr primary_crtc;
 	drmModePlanePtr overlay_plane;
 	unsigned int num_planes;
-	drmModePlanePtr mode_planes[2];
+	drmModePlanePtr mode_planes[4];
 	struct drm_xv_prop props[NR_DRM_PROPS];
 };
 
@@ -780,6 +783,41 @@ armada_drm_plane_fbid(ScrnInfoPtr pScrn, struct drm_xv *drmxv, int image,
 	return Success;
 }
 
+static void armada_drm_primary_plane_restore(xf86CrtcPtr crtc)
+{
+	struct common_drm_info *drm = GET_DRM_INFO(crtc->scrn);
+	struct common_crtc_info *drmc = common_crtc(crtc);
+	int ret;
+
+	ret = drmModeSetPlane(drm->fd, drmc->primary_plane_id,
+			      drmc->mode_crtc->crtc_id, drm->fb_id, 0,
+			      crtc->x, crtc->y,
+			      crtc->mode.HDisplay, crtc->mode.VDisplay,
+			      0, 0,
+			      crtc->mode.HDisplay << 16,
+			      crtc->mode.VDisplay << 16);
+	if (ret)
+		xf86DrvMsg(crtc->scrn->scrnIndex, X_WARNING,
+			   "[drm] unable to restore plane %u: %s\n",
+			   drmc->primary_plane_id, strerror(errno));
+}
+
+static Bool armada_drm_primary_plane_disable(xf86CrtcPtr crtc)
+{
+	struct common_drm_info *drm = GET_DRM_INFO(crtc->scrn);
+	struct common_crtc_info *drmc = common_crtc(crtc);
+	int ret;
+
+	ret = drmModeSetPlane(drm->fd, drmc->primary_plane_id,
+			      0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0);
+	if (ret)
+		xf86DrvMsg(crtc->scrn->scrnIndex, X_WARNING,
+			   "[drm] unable to disable plane %u: %s\n",
+			   drmc->primary_plane_id, strerror(errno));
+
+	return ret == 0;
+}
+
 static void armada_drm_plane_disable(ScrnInfoPtr pScrn, struct drm_xv *drmxv,
 	drmModePlanePtr mode_plane)
 {
@@ -797,6 +835,11 @@ static void
 armada_drm_plane_StopVideo(ScrnInfoPtr pScrn, pointer data, Bool cleanup)
 {
 	struct drm_xv *drmxv = data;
+
+	if (drmxv->primary_crtc) {
+		armada_drm_primary_plane_restore(drmxv->primary_crtc);
+		drmxv->primary_crtc = NULL;
+	}
 
 	if (drmxv->overlay_plane) {
 		RegionEmpty(&drmxv->clipBoxes);
@@ -823,6 +866,13 @@ static Bool armada_drm_check_plane(ScrnInfoPtr pScrn, struct drm_xv *drmxv,
 	}
 
 	crtc_mask = 1 << common_crtc(crtc)->num;
+
+	if (drmxv->primary_crtc && drmxv->primary_crtc != crtc) {
+		/* Moved to a different CRTC */
+		armada_drm_primary_plane_restore(drmxv->primary_crtc);
+		drmxv->primary_crtc = NULL;
+		drmxv->primary_obscured = FALSE;
+	}
 
 	if (drmxv->overlay_plane &&
 	    !(drmxv->overlay_plane->possible_crtcs & crtc_mask)) {
@@ -887,6 +937,29 @@ armada_drm_plane_Put(ScrnInfoPtr pScrn, struct drm_xv *drmxv, uint32_t fb_id,
 			common_crtc(crtc)->mode_crtc->crtc_id, fb_id, 0,
 			crtc_x, crtc_y, dst->x2 - dst->x1, dst->y2 - dst->y1,
 			x1, y1, x2 - x1, y2 - y1);
+
+	if (drmxv->has_primary) {
+		BoxRec crtcbox;
+		Bool obscured;
+
+		crtcbox.x1 = crtc->x;
+		crtcbox.y1 = crtc->y;
+		crtcbox.x2 = crtc->x + crtc->mode.HDisplay;
+		crtcbox.y2 = crtc->y + crtc->mode.VDisplay;
+
+		obscured = RegionContainsRect(clipBoxes, &crtcbox) == rgnIN;
+
+		if (obscured && !drmxv->primary_obscured) {
+			if (common_crtc(crtc)->primary_plane_id &&
+			    armada_drm_primary_plane_disable(crtc))
+				drmxv->primary_crtc = crtc;
+		} else if (!obscured && drmxv->primary_crtc) {
+			armada_drm_primary_plane_restore(drmxv->primary_crtc);
+			drmxv->primary_crtc = NULL;
+		}
+
+		drmxv->primary_obscured = obscured;
+	}
 
 	return Success;
 }
@@ -1129,6 +1202,8 @@ static Bool armada_drm_gather_planes(ScrnInfoPtr pScrn, struct drm_xv *drmxv)
 	if (!common_drm_init_plane_resources(pScrn))
 		return FALSE;
 
+	drmxv->has_primary = drm->has_universal_planes;
+
 	for (i = 0; i < drm->num_overlay_planes &&
 		    i < ARRAY_SIZE(drmxv->mode_planes); i++) {
 		drmxv->mode_planes[drmxv->num_planes++] =
@@ -1180,6 +1255,9 @@ Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 
 	if (!armada_drm_gather_planes(pScrn, drmxv))
 		goto err_free;
+
+	if (!xf86ReturnOptValBool(arm->Options, OPTION_XV_DISPRIMARY, TRUE))
+		drmxv->has_primary = FALSE;
 
 	prefer_overlay = xf86ReturnOptValBool(arm->Options,
 					      OPTION_XV_PREFEROVL, TRUE);
