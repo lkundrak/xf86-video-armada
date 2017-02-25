@@ -1103,59 +1103,42 @@ static void armada_drm_property_setup(struct drm_xv *drmxv,
 	}
 }
 
+static void armada_drm_parse_properties(ScrnInfoPtr pScrn,
+	struct drm_xv *drmxv, drmModeObjectPropertiesPtr props)
+{
+	unsigned int i;
+
+	for (i = 0; i < props->count_props; i++) {
+		drmModePropertyPtr prop;
+		uint32_t prop_id = props->props[i];
+		uint64_t prop_val = props->prop_values[i];
+
+		prop = common_drm_plane_get_property(pScrn, prop_id);
+		if (!prop)
+			continue;
+
+		armada_drm_property_setup(drmxv, prop, prop_val);
+	}
+}
+
 static Bool armada_drm_gather_planes(ScrnInfoPtr pScrn, struct drm_xv *drmxv)
 {
-	drmModePlaneResPtr res;
+	struct common_drm_info *drm = GET_DRM_INFO(pScrn);
 	unsigned int i;
-	Bool ret = FALSE;
 
-	/* Get the plane resources and the overlay planes */
-	res = drmModeGetPlaneResources(drmxv->fd);
-	if (!res)
-		goto err;
+	if (!common_drm_init_plane_resources(pScrn))
+		return FALSE;
 
-	/* Get all plane information */
-	for (i = 0; i < res->count_planes &&
+	for (i = 0; i < drm->num_overlay_planes &&
 		    i < ARRAY_SIZE(drmxv->mode_planes); i++) {
-		drmModeObjectPropertiesPtr props;
-		drmModePlanePtr plane;
-		unsigned j;
+		drmxv->mode_planes[drmxv->num_planes++] =
+			drm->overlay_planes[i].mode_plane;
 
-		plane = drmModeGetPlane(drmxv->fd, res->planes[i]);
-		if (!plane)
-			goto err;
-
-		drmxv->mode_planes[drmxv->num_planes] = plane;
-		drmxv->num_planes++;
-
-		props = drmModeObjectGetProperties(drmxv->fd, res->planes[i],
-						   DRM_MODE_OBJECT_PLANE);
-		if (!props)
-			goto err;
-
-		for (j = 0; j < props->count_props; j++) {
-			drmModePropertyPtr prop;
-
-			prop = drmModeGetProperty(drmxv->fd, props->props[j]);
-			if (!prop)
-				continue;
-
-			armada_drm_property_setup(drmxv, prop,
-						  props->prop_values[j]);
-			drmModeFreeProperty(prop);
-		}
-		drmModeFreeObjectProperties(props);
+		armada_drm_parse_properties(pScrn, drmxv,
+					    drm->overlay_planes[i].mode_props);
 	}
 
-	ret = TRUE;
-
-err:
-	if (res) {
-		/* Done with the plane resources */
-		drmModeFreePlaneResources(res);
-	}
-
-	return ret;
+	return TRUE;
 }
 
 Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
@@ -1230,13 +1213,15 @@ Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 	return TRUE;
 
  err_free:
-	for (i = 0; i < drmxv->num_planes; i++)
-		drmModeFreePlane(drmxv->mode_planes[i]);
 	if (gpu_adap) {
 		free(gpu_adap->pImages);
 		free(gpu_adap->pPortPrivates);
 		free(gpu_adap);
 	}
+
 	free(drmxv);
+
+	common_drm_cleanup_plane_resources(pScrn);
+
 	return FALSE;
 }
