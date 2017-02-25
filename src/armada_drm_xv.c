@@ -91,9 +91,9 @@ struct drm_xv {
 	/* Plane information */
 	const struct xv_image_format *plane_format;
 	uint32_t plane_fb_id;
-	drmModePlanePtr plane;
+	drmModePlanePtr overlay_plane;
 	unsigned int num_planes;
-	drmModePlanePtr planes[2];
+	drmModePlanePtr mode_planes[2];
 	struct drm_xv_prop props[NR_DRM_PROPS];
 };
 
@@ -129,7 +129,7 @@ static int armada_drm_prop_set(ScrnInfoPtr pScrn,
 
 	for (i = 0; i < drmxv->num_planes; i++)
 		drmModeObjectSetProperty(drmxv->fd,
-					 drmxv->planes[i]->plane_id,
+					 drmxv->mode_planes[i]->plane_id,
 					 DRM_MODE_OBJECT_PLANE, prop_id,
 					 value);
 
@@ -785,12 +785,12 @@ armada_drm_plane_StopVideo(ScrnInfoPtr pScrn, pointer data, Bool cleanup)
 {
 	struct drm_xv *drmxv = data;
 
-	if (drmxv->plane) {
+	if (drmxv->overlay_plane) {
 		int ret;
 
 		RegionEmpty(&drmxv->clipBoxes);
 
-		ret = drmModeSetPlane(drmxv->fd, drmxv->plane->plane_id,
+		ret = drmModeSetPlane(drmxv->fd, drmxv->overlay_plane->plane_id,
 				      0, 0, 0,  0, 0, 0, 0,  0, 0, 0, 0);
 		if (ret)
 			xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
@@ -818,7 +818,7 @@ static Bool armada_drm_check_plane(ScrnInfoPtr pScrn, struct drm_xv *drmxv,
 
 	crtc_mask = 1 << common_crtc(crtc)->num;
 
-	plane = drmxv->plane;
+	plane = drmxv->overlay_plane;
 	if (plane && !(plane->possible_crtcs & crtc_mask)) {
 		/* Moved on to a different CRTC */
 		armada_drm_plane_StopVideo(pScrn, drmxv, FALSE);
@@ -829,11 +829,11 @@ static Bool armada_drm_check_plane(ScrnInfoPtr pScrn, struct drm_xv *drmxv,
 		unsigned i;
 
 		for (i = 0; i < drmxv->num_planes; i++)
-			if (drmxv->planes[i]->possible_crtcs & crtc_mask)
-				plane = drmxv->planes[i];
+			if (drmxv->mode_planes[i]->possible_crtcs & crtc_mask)
+				plane = drmxv->mode_planes[i];
 
 		/* Our new plane */
-		drmxv->plane = plane;
+		drmxv->overlay_plane = plane;
 
 		if (!plane)
 			return FALSE;
@@ -863,7 +863,6 @@ armada_drm_plane_Put(ScrnInfoPtr pScrn, struct drm_xv *drmxv, uint32_t fb_id,
 	short src_x, short src_y, short src_w, short src_h,
 	short width, short height, BoxPtr dst, RegionPtr clipBoxes)
 {
-	drmModePlanePtr plane;
 	xf86CrtcPtr crtc = NULL;
 	uint32_t crtc_x, crtc_y;
 	INT32 x1, x2, y1, y2;
@@ -885,8 +884,7 @@ armada_drm_plane_Put(ScrnInfoPtr pScrn, struct drm_xv *drmxv, uint32_t fb_id,
 	crtc_x = dst->x1 - crtc->x;
 	crtc_y = dst->y1 - crtc->y;
 
-	plane = drmxv->plane;
-	drmModeSetPlane(drmxv->fd, plane->plane_id,
+	drmModeSetPlane(drmxv->fd, drmxv->overlay_plane->plane_id,
 			common_crtc(crtc)->mode_crtc->crtc_id, fb_id, 0,
 			crtc_x, crtc_y, dst->x2 - dst->x1, dst->y2 - dst->y1,
 			x1, y1, x2 - x1, y2 - y1);
@@ -1118,7 +1116,8 @@ static Bool armada_drm_gather_planes(ScrnInfoPtr pScrn, struct drm_xv *drmxv)
 		goto err;
 
 	/* Get all plane information */
-	for (i = 0; i < res->count_planes && i < ARRAY_SIZE(drmxv->planes); i++) {
+	for (i = 0; i < res->count_planes &&
+		    i < ARRAY_SIZE(drmxv->mode_planes); i++) {
 		drmModeObjectPropertiesPtr props;
 		drmModePlanePtr plane;
 		unsigned j;
@@ -1127,7 +1126,7 @@ static Bool armada_drm_gather_planes(ScrnInfoPtr pScrn, struct drm_xv *drmxv)
 		if (!plane)
 			goto err;
 
-		drmxv->planes[drmxv->num_planes] = plane;
+		drmxv->mode_planes[drmxv->num_planes] = plane;
 		drmxv->num_planes++;
 
 		props = drmModeObjectGetProperties(drmxv->fd, res->planes[i],
@@ -1207,10 +1206,10 @@ Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 	if (gpu_adap && !prefer_overlay)
 		xv[num++] = gpu_adap;
 
-	if (drmxv->planes[0]) {
+	if (drmxv->mode_planes[0]) {
 		priv[0].ptr = drmxv;
 		plane = armada_drm_XvInitPlane(pScrn, priv, drmxv,
-					       drmxv->planes[0]);
+					       drmxv->mode_planes[0]);
 		if (!plane)
 			goto err_free;
 		xv[num++] = plane;
@@ -1233,7 +1232,7 @@ Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 
  err_free:
 	for (i = 0; i < drmxv->num_planes; i++)
-		drmModeFreePlane(drmxv->planes[i]);
+		drmModeFreePlane(drmxv->mode_planes[i]);
 	if (gpu_adap) {
 		free(gpu_adap->pImages);
 		free(gpu_adap->pPortPrivates);
