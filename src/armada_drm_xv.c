@@ -92,6 +92,7 @@ struct drm_xv {
 	const struct xv_image_format *plane_format;
 	uint32_t plane_fb_id;
 	drmModePlanePtr plane;
+	unsigned int num_planes;
 	drmModePlanePtr planes[2];
 	struct drm_xv_prop props[NR_DRM_PROPS];
 };
@@ -126,15 +127,12 @@ static int armada_drm_prop_set(ScrnInfoPtr pScrn,
 	prop->value = value;
 	prop_id = prop->prop_id;
 
-	for (i = 0; i < ARRAY_SIZE(drmxv->planes); i++) {
-		if (!drmxv->planes[i])
-			continue;
-
+	for (i = 0; i < drmxv->num_planes; i++)
 		drmModeObjectSetProperty(drmxv->fd,
 					 drmxv->planes[i]->plane_id,
 					 DRM_MODE_OBJECT_PLANE, prop_id,
 					 value);
-	}
+
 	return Success;
 }
 
@@ -830,9 +828,8 @@ static Bool armada_drm_check_plane(ScrnInfoPtr pScrn, struct drm_xv *drmxv,
 	if (!plane) {
 		unsigned i;
 
-		for (i = 0; i < ARRAY_SIZE(drmxv->planes); i++)
-			if (drmxv->planes[i] &&
-			    drmxv->planes[i]->possible_crtcs & crtc_mask)
+		for (i = 0; i < drmxv->num_planes; i++)
+			if (drmxv->planes[i]->possible_crtcs & crtc_mask)
 				plane = drmxv->planes[i];
 
 		/* Our new plane */
@@ -1122,13 +1119,19 @@ static Bool armada_drm_gather_planes(ScrnInfoPtr pScrn, struct drm_xv *drmxv)
 	/* Get all plane information */
 	for (i = 0; i < res->count_planes && i < ARRAY_SIZE(drmxv->planes); i++) {
 		drmModeObjectPropertiesPtr props;
-		uint32_t plane_id = res->planes[i];
+		drmModePlanePtr plane;
 		unsigned j;
 
-		drmxv->planes[i] = drmModeGetPlane(drmxv->fd, plane_id);
-		props = drmModeObjectGetProperties(drmxv->fd, plane_id,
+		plane = drmModeGetPlane(drmxv->fd, res->planes[i]);
+		if (!plane)
+			goto err;
+
+		drmxv->planes[drmxv->num_planes] = plane;
+		drmxv->num_planes++;
+
+		props = drmModeObjectGetProperties(drmxv->fd, res->planes[i],
 						   DRM_MODE_OBJECT_PLANE);
-		if (!drmxv->planes[i] || !props)
+		if (!props)
 			goto err;
 
 		for (j = 0; j < props->count_props; j++) {
@@ -1227,9 +1230,8 @@ Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 	return TRUE;
 
  err_free:
-	for (i = 0; i < ARRAY_SIZE(drmxv->planes); i++)
-		if (drmxv->planes[i])
-			drmModeFreePlane(drmxv->planes[i]);
+	for (i = 0; i < drmxv->num_planes; i++)
+		drmModeFreePlane(drmxv->planes[i]);
 	if (gpu_adap) {
 		free(gpu_adap->pImages);
 		free(gpu_adap->pPortPrivates);
