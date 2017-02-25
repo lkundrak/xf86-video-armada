@@ -17,6 +17,7 @@ struct common_crtc_info {
 	int drm_fd;
 	unsigned num;
 	drmModeCrtcPtr mode_crtc;
+	uint32_t primary_plane_id;
 	void *cursor_data;
 	uint32_t cursor_handle;
 	uint32_t rotate_fb_id;
@@ -33,6 +34,11 @@ struct drm_udev_info {
 	pointer *handler;
 	dev_t drm_dev;
 	CloseScreenProcPtr CloseScreen;
+};
+
+struct common_drm_plane {
+	drmModePlanePtr mode_plane;
+	drmModeObjectPropertiesPtr mode_props;
 };
 
 struct common_drm_info {
@@ -60,6 +66,11 @@ struct common_drm_info {
 #ifdef HAVE_UDEV
 	struct drm_udev_info udev;
 #endif
+
+	Bool has_universal_planes;
+	void *plane_property_hash;
+	unsigned int num_overlay_planes;
+	struct common_drm_plane *overlay_planes;
 
 	OptionInfoPtr Options;
 	CloseScreenProcPtr CloseScreen;
@@ -98,6 +109,11 @@ void common_drm_crtc_shadow_destroy(xf86CrtcPtr crtc);
 
 Bool common_drm_init_mode_resources(ScrnInfoPtr pScrn,
 	const xf86CrtcFuncsRec *funcs);
+
+drmModePropertyPtr common_drm_plane_get_property(ScrnInfoPtr pScrn,
+	uint32_t prop_id);
+void common_drm_cleanup_plane_resources(ScrnInfoPtr pScrn);
+Bool common_drm_init_plane_resources(ScrnInfoPtr pScrn);
 
 Bool common_drm_flip(ScrnInfoPtr pScrn, PixmapPtr pixmap,
 	struct common_drm_event *event, xf86CrtcPtr ref_crtc);
