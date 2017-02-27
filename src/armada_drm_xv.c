@@ -40,6 +40,7 @@ enum armada_drm_properties {
 	PROP_DRM_SATURATION,
 	PROP_DRM_BRIGHTNESS,
 	PROP_DRM_CONTRAST,
+	PROP_DRM_ITURBT_709,
 	PROP_DRM_COLORKEY,
 	NR_DRM_PROPS
 };
@@ -48,6 +49,7 @@ static const char *armada_drm_property_names[NR_DRM_PROPS] = {
 	[PROP_DRM_SATURATION] = "saturation",
 	[PROP_DRM_BRIGHTNESS] = "brightness",
 	[PROP_DRM_CONTRAST] = "contrast",
+	[PROP_DRM_ITURBT_709] = "iturbt_709",
 	[PROP_DRM_COLORKEY] = "colorkey",
 };
 
@@ -105,6 +107,7 @@ enum {
 	attr_saturation,
 	attr_brightness,
 	attr_contrast,
+	attr_iturbt_709,
 	attr_autopaint_colorkey,
 	attr_colorkey,
 	attr_pipe,
@@ -244,6 +247,7 @@ static XF86AttributeRec OverlayAttributes[] = {
 	{ XvSettable | XvGettable, -16384, 16383,      "XV_SATURATION" },
 	{ XvSettable | XvGettable, -256,   255,        "XV_BRIGHTNESS" },
 	{ XvSettable | XvGettable, -16384, 16383,      "XV_CONTRAST" },
+	{ XvSettable | XvGettable, 0,      1,          "XV_ITURBT_709" },
 	{ XvSettable | XvGettable, 0,      1,          "XV_AUTOPAINT_COLORKEY"},
 	{ XvSettable | XvGettable, 0,      0x00ffffff, "XV_COLORKEY" },
 	{ XvSettable | XvGettable, -1,     2,          "XV_PIPE" },
@@ -280,6 +284,13 @@ static struct xv_attr_data armada_drm_xv_attributes[] = {
 		.set = armada_drm_prop_set,
 		.get = armada_drm_prop_get,
 		.attr = &OverlayAttributes[attr_contrast],
+	},
+	[attr_iturbt_709] = {
+		.name = "XV_ITURBT_709",
+		.id = PROP_DRM_ITURBT_709,
+		.set = armada_drm_prop_set,
+		.get = armada_drm_prop_get,
+		.attr = &OverlayAttributes[attr_iturbt_709],
 	},
 	[attr_autopaint_colorkey] = {
 		.name = "XV_AUTOPAINT_COLORKEY",
@@ -1029,8 +1040,9 @@ armada_drm_XvInitPlane(ScrnInfoPtr pScrn, DevUnion *priv, struct drm_xv *drmxv,
 	drmModePlanePtr mode_plane)
 {
 	XF86VideoAdaptorPtr p;
+	XF86AttributeRec *attrs;
 	XF86ImageRec *images;
-	unsigned i, num_images;
+	unsigned i, num_images, num_attrs;
 
 	p = xf86XVAllocateVideoAdaptorRec(pScrn);
 	if (!p)
@@ -1057,6 +1069,23 @@ armada_drm_XvInitPlane(ScrnInfoPtr pScrn, DevUnion *priv, struct drm_xv *drmxv,
 	if (drmxv->has_xvbo)
 		images[num_images++] = (XF86ImageRec)XVIMAGE_XVBO;
 
+	attrs = calloc(ARRAY_SIZE(armada_drm_xv_attributes), sizeof(*attrs));
+	if (!attrs) {
+		free(images);
+		free(p);
+		return NULL;
+	}
+
+	for (num_attrs = i = 0; i < ARRAY_SIZE(armada_drm_xv_attributes); i++) {
+		struct xv_attr_data *d = &armada_drm_xv_attributes[i];
+
+		if (d->get == armada_drm_prop_get &&
+		    drmxv->props[d->id].prop_id == 0)
+			continue;
+
+		attrs[num_attrs++] = *d->attr;
+	}
+
 	p->type = XvWindowMask | XvInputMask | XvImageMask;
 	p->flags = VIDEO_OVERLAID_IMAGES;
 	p->name = "Marvell Armada Overlay Video";
@@ -1066,8 +1095,8 @@ armada_drm_XvInitPlane(ScrnInfoPtr pScrn, DevUnion *priv, struct drm_xv *drmxv,
 	p->pFormats = OverlayFormats;
 	p->nPorts = 1;
 	p->pPortPrivates = priv;
-	p->nAttributes = sizeof(OverlayAttributes) / sizeof(XF86AttributeRec);
-	p->pAttributes = OverlayAttributes;
+	p->nAttributes = num_attrs;
+	p->pAttributes = attrs;
 	p->nImages = num_images;
 	p->pImages = images;
 	p->StopVideo = armada_drm_plane_StopVideo;

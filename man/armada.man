@@ -162,6 +162,10 @@ the overlay window.  Other values select an explicit CRTC.  Default: -1.
 These options can be used to adjust the overlaid picture brightness,
 contrast and saturation levels.  These options are dependent on their
 presence in the Linux kernel drm driver.
+.SS "XV_ITURBT_709"
+XV_ITURBT_709 sets the colorimetry for YUV format video.  A value of 0
+selects ITU-R BT.601 colorspace.  A value of 1 selects ITU-R BT.709
+colorspace.  This option is dependent on the Linux kernel drm driver.
 
 
 .SH XV TEXTURED VIDEO ATTRIBUTES
