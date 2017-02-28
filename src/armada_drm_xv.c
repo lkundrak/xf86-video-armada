@@ -1221,10 +1221,10 @@ Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 	ScreenPtr scrn = screenInfo.screens[pScrn->scrnIndex];
 	struct common_drm_info *drm = GET_DRM_INFO(pScrn);
 	struct armada_drm_info *arm = GET_ARMADA_DRM_INFO(pScrn);
-	XF86VideoAdaptorPtr xv[2], plane, gpu_adap;
+	XF86VideoAdaptorPtr xv[2], ovl_adap = NULL, gpu_adap = NULL;
 	struct drm_xv *drmxv;
 	DevUnion priv[1];
-	unsigned i, num, cap = 0;
+	unsigned num, cap = 0;
 	Bool ret, prefer_overlay;
 
 	if (!armada_drm_init_atoms(pScrn))
@@ -1233,8 +1233,6 @@ Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 	/* Initialise the GPU textured adapter first. */
 	if (arm->accel_ops && arm->accel_ops->xv_init)
 		gpu_adap = arm->accel_ops->xv_init(scrn, &cap);
-	else
-		gpu_adap = NULL;
 
 	/* FIXME: we leak this */
 	drmxv = calloc(1, sizeof *drmxv);
@@ -1259,6 +1257,14 @@ Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 	if (!xf86ReturnOptValBool(arm->Options, OPTION_XV_DISPRIMARY, TRUE))
 		drmxv->has_primary = FALSE;
 
+	if (drmxv->mode_planes[0]) {
+		priv[0].ptr = drmxv;
+		ovl_adap = armada_drm_XvInitPlane(pScrn, priv, drmxv,
+						  drmxv->mode_planes[0]);
+		if (!ovl_adap)
+			goto err_free;
+	}
+
 	prefer_overlay = xf86ReturnOptValBool(arm->Options,
 					      OPTION_XV_PREFEROVL, TRUE);
 
@@ -1266,31 +1272,32 @@ Bool armada_drm_XvInit(ScrnInfoPtr pScrn)
 	if (gpu_adap && !prefer_overlay)
 		xv[num++] = gpu_adap;
 
-	if (drmxv->mode_planes[0]) {
-		priv[0].ptr = drmxv;
-		plane = armada_drm_XvInitPlane(pScrn, priv, drmxv,
-					       drmxv->mode_planes[0]);
-		if (!plane)
-			goto err_free;
-		xv[num++] = plane;
-	}
+	if (ovl_adap)
+		xv[num++] = ovl_adap;
 
 	if (gpu_adap && prefer_overlay)
 		xv[num++] = gpu_adap;
 
 	ret = xf86XVScreenInit(scrn, xv, num);
 
-	for (i = 0; i < num; i++) {
-		if (xv[i]) {
-			free(xv[i]->pImages);
-			free(xv[i]);
-		}
+	if (ovl_adap) {
+		free(ovl_adap->pImages);
+		free(ovl_adap);
+	}
+	if (gpu_adap) {
+		free(gpu_adap->pImages);
+		free(gpu_adap->pPortPrivates);
+		free(gpu_adap);
 	}
 	if (!ret)
 		goto err_free;
 	return TRUE;
 
  err_free:
+	if (ovl_adap) {
+		free(ovl_adap->pImages);
+		free(ovl_adap);
+	}
 	if (gpu_adap) {
 		free(gpu_adap->pImages);
 		free(gpu_adap->pPortPrivates);
