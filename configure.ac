@@ -126,13 +126,13 @@ AC_MSG_RESULT([$ACCEL_GALCORE])
 # Etnaviv GPU acceleration
 AC_ARG_ENABLE(etnadrm,
 	      AC_HELP_STRING([--disable-etnadrm],
-			     [Disable Etnaviv DRM acceleration support [[default=enabled]]]),
+			     [Disable Etnaviv (DRM kernel driver) acceleration support [[default=enabled]]]),
 	      [ACCEL_ETNADRM="$enableval"],
 	      [ACCEL_ETNADRM=auto])
 
 AC_ARG_ENABLE(etnaviv,
 	      AC_HELP_STRING([--disable-etnaviv],
-			     [Disable Etnaviv acceleration support [[default=enable]]]),
+			     [Disable Etnaviv (GALcore kernel driver) acceleration support [[default=enable]]]),
 	      [ACCEL_ETNAVIV="$enableval"],
 	      [ACCEL_ETNAVIV=auto])
 
@@ -196,25 +196,25 @@ AS_IF([test x$ACCEL_ETNAVIV != xno || test x$ACCEL_ETNADRM != xno],
          [
       AC_CHECK_LIB([etnaviv], [etna_bo_from_dmabuf],
                    [DUMMY=y],
-                   [AC_MSG_ERROR([etnaviv support requires etna_bo_from_dmabuf()])])
+                   [AC_MSG_ERROR([etnaviv (GALcore kernel driver) support requires etna_bo_from_dmabuf()])])
       AC_CHECK_LIB([etnaviv], [etna_bo_from_usermem_prot],
                    [DUMMY=y],
-                   [AC_MSG_ERROR([etnaviv support requires etna_bo_from_usermem_prot()])])
+                   [AC_MSG_ERROR([etnaviv (GALcore kernel driver) support requires etna_bo_from_usermem_prot()])])
    ])
    LDFLAGS="$saved_LDFLAGS"
    CFLAGS="$saved_CFLAGS"
    AS_IF([test x$PKGCFG_ETNAVIV != xyes], [ETNAVIV_LIBS+=" -letnaviv"])
 ])
-AC_MSG_CHECKING([whether to build Etnaviv acceleration support])
+AC_MSG_CHECKING([whether to build Etnaviv (GALcore kernel driver) acceleration support])
 AS_IF([test x$ACCEL_ETNAVIV = xyes],
-      [AC_DEFINE(HAVE_ACCEL_ETNAVIV,1,[Enable Etnaviv acceleration support])
+      [AC_DEFINE(HAVE_ACCEL_ETNAVIV,1,[Enable Etnaviv (GALcore kernel driver) acceleration support])
        DRIVERS="etnaviv_gpu $DRIVERS"])
 AM_CONDITIONAL(HAVE_ACCEL_ETNAVIV, test x$ACCEL_ETNAVIV = xyes)
 AC_MSG_RESULT([$ACCEL_ETNAVIV])
 
-AC_MSG_CHECKING([whether to build Etnaviv DRM acceleration support])
+AC_MSG_CHECKING([whether to build Etnaviv (DRM kernel driver) acceleration support])
 AS_IF([test x$ACCEL_ETNADRM = xyes],
-      [AC_DEFINE(HAVE_ACCEL_ETNADRM,1,[Enable Etnaviv DRM acceleration support])
+      [AC_DEFINE(HAVE_ACCEL_ETNADRM,1,[Enable Etnaviv (DRM kernel driver) acceleration support])
        DRIVERS="etnadrm_gpu $DRIVERS"])
 AM_CONDITIONAL(HAVE_ACCEL_ETNADRM, test x$ACCEL_ETNADRM = xyes)
 AC_MSG_RESULT([$ACCEL_ETNADRM])
