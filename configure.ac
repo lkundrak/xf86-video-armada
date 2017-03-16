@@ -188,10 +188,17 @@ AS_IF([test x$ACCEL_ETNAVIV != xno || test x$ACCEL_ETNADRM != xno],
    saved_CFLAGS="$CFLAGS"
    LDFLAGS="$LDFLAGS $ETNAVIV_LIBS"
    CFLAGS="$CFLAGS $ETNAVIV_CFLAGS"
-   AC_CHECK_LIB([etnaviv], [viv_open],
-                [AS_IF([test x$ACCEL_ETNAVIV = xauto], [ACCEL_ETNAVIV=yes])],
-                [ACCEL_ETNAVIV=no])
    AS_IF([test x$ACCEL_ETNADRM = xauto], [ACCEL_ETNADRM=yes], [ACCEL_ETNADRM=no])
+   AS_IF([test x$ACCEL_ETNAVIV != xno],
+         [
+      AC_CHECK_LIB([etnaviv], [viv_open],
+                   [AS_IF([test x$ACCEL_ETNAVIV = xauto],
+			  [ACCEL_ETNAVIV=yes],
+			  [
+                       AC_MSG_ERROR([etnaviv (GALcore kernel driver) support requires libetnaviv library])
+                    ])],
+                   [ACCEL_ETNAVIV=no])
+   ])
    AS_IF([test x$ACCEL_ETNAVIV != xno],
          [
       AC_CHECK_LIB([etnaviv], [etna_bo_from_dmabuf],
