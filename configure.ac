@@ -77,10 +77,10 @@ AC_ARG_WITH(xorg-module-dir,
 
 # Vivante GPU acceleration using libGAL
 AC_ARG_ENABLE(vivante,
-	      AC_HELP_STRING([--disable-vivante],
-			     [Disable Vivante libGAL acceleration support [[default=enable]]]),
+	      AC_HELP_STRING([--enable-vivante],
+			     [Enable Vivante libGAL acceleration support [[default=enable]]]),
 	      [ACCEL_GALCORE="$enableval"],
-	      [ACCEL_GALCORE=auto])
+	      [ACCEL_GALCORE=no])
 
 AC_ARG_WITH(libgal-include,
             AC_HELP_STRING([--with-libgal-include=PATH],
@@ -131,10 +131,10 @@ AC_ARG_ENABLE(etnadrm,
 	      [ACCEL_ETNADRM=auto])
 
 AC_ARG_ENABLE(etnaviv,
-	      AC_HELP_STRING([--disable-etnaviv],
-			     [Disable Etnaviv (GALcore kernel driver) acceleration support [[default=enable]]]),
+	      AC_HELP_STRING([--enable-etnaviv],
+			     [Enable Etnaviv (GALcore kernel driver) acceleration support [[default=enable]]]),
 	      [ACCEL_ETNAVIV="$enableval"],
-	      [ACCEL_ETNAVIV=auto])
+	      [ACCEL_ETNAVIV=no])
 
 AC_ARG_WITH(etnaviv-source,
             AC_HELP_STRING([--with-etnaviv-source=PATH],
