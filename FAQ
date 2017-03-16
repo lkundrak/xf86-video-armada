@@ -50,3 +50,28 @@ A2. No, it should not be necessary to build etna_viv or configure it
       etnaviv/state.xml.h
       etnaviv/state_2d.xml.h
       etnaviv/viv.h
+
+Q3. Why does xf86-video-armada use libdrm_armada and not libdrm_etnaviv?
+
+A3. libdrm_armada provides the DDX with the ability to interface with
+    the KMS (display) side, it has almost nothing to do with the GPU
+    drivers.  It provides efficient allocation of buffers for the KMS,
+    and provides various features missing from the core libdrm that are
+    necessary to interwork with the GPU drivers.
+
+    libdrm_etnaviv is not used by the etnaviv DRM GPU driver as the
+    libdrm_etnaviv interfaces are too restrictive to allow efficient
+    command stream generation, lacks proper buffer caching for efficient
+    buffer handling, and implementation would mean yours truely would
+    need to maintain three separate GPU drivers for the same hardware.
+
+Q4. Is the dependency on libdrm_armada going to be removed?
+
+A4. Not any time soon.  The libdrm_armada is necessary for the KMS side
+    as explained in Q3.
+
+Q5. Is libdrm_etnaviv going to be integrated?
+
+A5. As long as the DDX supports the libetnaviv (GALcore compatible) GPU
+    backend, and libdrm_etnaviv suffers the problems mentioned in Q3,
+    moving to libdrm_etnaviv would be a backwards step.
