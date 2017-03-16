@@ -234,12 +234,12 @@ AC_ARG_ENABLE(dri2, AC_HELP_STRING([--disable-dri2],
 AC_ARG_ENABLE(dri3, AC_HELP_STRING([--disable-dri3],
 		[Disable DRI3 support [[default=auto]]]),
 		[DRI3="$enableval"],
-		[DRI3=auto])
+		[DRI3=no])
 
 AC_ARG_ENABLE(present, AC_HELP_STRING([--disable-present],
 		[Disable PRESENT support [[default=auto]]]),
 		[PRESENT="$enableval"],
-		[PRESENT=auto])
+		[PRESENT=no])
 
 # Checks for pkg-config packages
 PKG_CHECK_MODULES(XORG, [xorg-server >= 1.9.99.1 xproto fontsproto])
