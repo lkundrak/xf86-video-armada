@@ -1229,6 +1229,8 @@ static void etnaviv_accel_glyph_upload(ScreenPtr pScreen, PicturePtr pDst,
 		if (!unode)
 			return;
 
+		memset(unode, 0, sizeof(*unode));
+
 		size = pitch * height + align - 1;
 		size &= ~(align - 1);
 
