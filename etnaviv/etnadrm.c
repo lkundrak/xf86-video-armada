@@ -273,9 +273,9 @@ static void etnadrm_convert_timeout(struct drm_etnaviv_timespec *ts,
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
 	ts->tv_sec = now.tv_sec + timeout / 1000;
-	ts->tv_nsec = now.tv_nsec + (timeout % 1000) * 10000000;
-	if (ts->tv_nsec > 1000000000) {
-		ts->tv_nsec -= 1000000000;
+	ts->tv_nsec = now.tv_nsec + (timeout % 1000) * 1000 * 1000;
+	if (ts->tv_nsec > 1000 * 1000 * 1000) {
+		ts->tv_nsec -= 1000 * 1000 * 1000;
 		ts->tv_sec += 1;
 	}
 }
