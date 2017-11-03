@@ -110,13 +110,13 @@ static void etnaviv_debug_blend_op(const char *func,
 
 	fprintf(stderr,
 		"%s: op 0x%02x %ux%u\n"
-		"  src  %s\n"
-		"  mask %s\n"
-		"  dst  %s\n",
+		"  src  %+d,%+d %s\n"
+		"  mask %+d,%+d %s\n"
+		"  dst  %+d,%+d %s\n",
 		func, op, width, height,
-		picture_desc(pSrc, src_buf, sizeof(src_buf)),
-		picture_desc(pMask, mask_buf, sizeof(mask_buf)),
-		picture_desc(pDst, dst_buf, sizeof(dst_buf)));
+		xSrc, ySrc, picture_desc(pSrc, src_buf, sizeof(src_buf)),
+		xMask, yMask, picture_desc(pMask, mask_buf, sizeof(mask_buf)),
+		xDst, yDst, picture_desc(pDst, dst_buf, sizeof(dst_buf)));
 }
 #endif
 
