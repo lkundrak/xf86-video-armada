@@ -120,29 +120,22 @@ static void etnaviv_debug_blend_op(const char *func,
 }
 #endif
 
-/*
- * For a rectangle described by (wxh+x+y) on the picture's drawable,
- * determine whether the picture repeat flag is meaningful.  The
- * rectangle must have had the transformation applied.
- */
-static Bool picture_needs_repeat(PicturePtr pPict, int x, int y,
-	unsigned w, unsigned h)
+static Bool picture_has_pixels(PicturePtr pPict, int x, int y,
+	const BoxRec *box)
 {
 	DrawablePtr pDrawable;
 
-	if (!pPict->repeat)
-		return FALSE;
-
+	/* If there is no drawable, there are no pixels that can be fetched */
 	pDrawable = pPict->pDrawable;
 	if (!pDrawable)
-		return TRUE;
-
-	if (pPict->filter != PictFilterConvolution &&
-	    (pDrawable->width > 1 || pDrawable->height > 1) &&
-	    drawable_contains(pDrawable, x, y, w, h))
 		return FALSE;
 
-	return TRUE;
+	/* Does the drawable contain all the pixels we want? */
+	if (pPict->filter != PictFilterConvolution &&
+	    drawable_contains(pDrawable, x, y, box->x2, box->y2))
+		return TRUE;
+
+	return FALSE;
 }
 
 static const struct etnaviv_blend_op etnaviv_composite_op[] = {
@@ -425,8 +418,8 @@ static struct etnaviv_pixmap *etnaviv_acquire_src(ScreenPtr pScreen,
 	if (!transform_is_integer_translation(pict->transform, &tx, &ty))
 		goto fallback;
 
-	if (picture_needs_repeat(pict, src_topleft->x + tx, src_topleft->y + ty,
-				 clip->x2, clip->y2))
+	if (!picture_has_pixels(pict, src_topleft->x + tx, src_topleft->y + ty,
+				clip))
 		goto fallback;
 
 	src_topleft->x += drawable->x + src_offset.x + tx;
@@ -661,8 +654,8 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 		mask_offset.y += ty;
 
 		/* We don't handle mask repeats (yet) */
-		if (picture_needs_repeat(pMask, mask_offset.x, mask_offset.y,
-					 clip_temp.x2, clip_temp.y2))
+		if (!picture_has_pixels(pMask, mask_offset.x, mask_offset.y,
+					&clip_temp))
 			goto fallback;
 
 		mask_offset.x += pMask->pDrawable->x;
