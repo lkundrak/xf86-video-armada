@@ -1031,6 +1031,7 @@ Bool etnaviv_accel_init(struct etnaviv *etnaviv)
 void etnaviv_accel_shutdown(struct etnaviv *etnaviv)
 {
 	TimerFree(etnaviv->cache_timer);
+	etnaviv->cache_timer = NULL;
 	etna_finish(etnaviv->ctx);
 	etnaviv_fence_retire_all(&etnaviv->fence_head);
 
