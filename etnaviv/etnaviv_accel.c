@@ -1013,11 +1013,18 @@ Bool etnaviv_accel_init(struct etnaviv *etnaviv)
 		struct etnaviv_format fmt = { .format = DE_FORMAT_A1R5G5B5 };
 		xPoint offset = { 0, -1 };
 		struct etna_bo *bo;
+		static const BoxRec gc320_box = { 0, 1, 1, 2 };
 
 		bo = etna_bo_new(etnaviv->conn, 4096, DRM_ETNA_GEM_TYPE_BMP);
 		etnaviv->gc320_etna_bo = bo;
-		etnaviv->gc320_wa_src = INIT_BLIT_BO(bo, 64, fmt, offset);
-		etnaviv->gc320_wa_dst = INIT_BLIT_BO(bo, 64, fmt, ZERO_OFFSET);
+		etnaviv->gc320_wa.src = INIT_BLIT_BO(bo, 64, fmt, offset);
+		etnaviv->gc320_wa.dst = INIT_BLIT_BO(bo, 64, fmt, ZERO_OFFSET);
+		etnaviv->gc320_wa.blend_op = NULL;
+		etnaviv->gc320_wa.clip = &gc320_box;
+		etnaviv->gc320_wa.src_origin_mode = SRC_ORIGIN_RELATIVE;
+		etnaviv->gc320_wa.rop = 0xcc;
+		etnaviv->gc320_wa.cmd = VIVS_DE_DEST_CONFIG_COMMAND_BIT_BLT;
+		etnaviv->gc320_wa.brush = FALSE;
 
 		/* reserve some additional batch space */
 		etnaviv->batch_de_high_watermark -= BATCH_WA_GC320_SIZE;

@@ -85,8 +85,7 @@ struct etnaviv {
 	Bool force_fallback;
 	struct drm_armada_bufmgr *bufmgr;
 	uint32_t bugs[1];
-	struct etnaviv_blit_buf gc320_wa_src;
-	struct etnaviv_blit_buf gc320_wa_dst;
+	struct etnaviv_de_op gc320_wa;
 	struct etna_bo *gc320_etna_bo;
 	int scrnIndex;
 #ifdef HAVE_DRI2

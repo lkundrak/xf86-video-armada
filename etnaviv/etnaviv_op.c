@@ -239,10 +239,8 @@ static void etnaviv_emit_2d_draw(struct etnaviv *etnaviv, const BoxRec *pbox,
 	EL_END();
 }
 
-void etnaviv_de_start(struct etnaviv *etnaviv, const struct etnaviv_de_op *op)
+static void de_start(struct etnaviv *etnaviv, const struct etnaviv_de_op *op)
 {
-	BATCH_SETUP_START(etnaviv);
-
 	if (op->src.bo)
 		etnaviv_set_source_bo(etnaviv, &op->src, op->src_origin_mode);
 	etnaviv_set_dest_bo(etnaviv, &op->dst, op->cmd);
@@ -251,23 +249,22 @@ void etnaviv_de_start(struct etnaviv *etnaviv, const struct etnaviv_de_op *op)
 		etnaviv_emit_brush(etnaviv, op->fg_colour);
 	etnaviv_emit_rop_clip(etnaviv, op->rop, op->rop, op->clip,
 			      op->dst.offset);
+}
 
+void etnaviv_de_start(struct etnaviv *etnaviv, const struct etnaviv_de_op *op)
+{
+	BATCH_SETUP_START(etnaviv);
+	de_start(etnaviv, op);
 	BATCH_SETUP_END(etnaviv);
 }
 
 void etnaviv_de_end(struct etnaviv *etnaviv)
 {
 	if (etnaviv->gc320_etna_bo) {
-		BoxRec box = { 0, 1, 1, 2 };
-
-		/* Append the GC320 workaround - 6 + 6 + 2 + 4 + 4 */
-		etnaviv_set_source_bo(etnaviv, &etnaviv->gc320_wa_src,
-				      SRC_ORIGIN_RELATIVE);
-		etnaviv_set_dest_bo(etnaviv, &etnaviv->gc320_wa_dst,
-				    VIVS_DE_DEST_CONFIG_COMMAND_BIT_BLT);
-		etnaviv_set_blend(etnaviv, NULL);
-		etnaviv_emit_rop_clip(etnaviv, 0xcc, 0xcc, &box, ZERO_OFFSET);
-		etnaviv_emit_2d_draw(etnaviv, &box, 1, ZERO_OFFSET);
+		/* Append the GC320 workaround - 6 + 6 + 2 + 4 + 4 + 4 */
+		de_start(etnaviv, &etnaviv->gc320_wa);
+		etnaviv_emit_2d_draw(etnaviv, etnaviv->gc320_wa.clip, 1,
+				     ZERO_OFFSET);
 	}
 
 	/* Append a flush, semaphore and stall to ensure that the FE */
