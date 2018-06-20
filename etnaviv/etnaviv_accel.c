@@ -151,6 +151,9 @@ static Bool etnaviv_init_dstsrc_drawable(struct etnaviv *etnaviv,
 	op->src.bo = op->src.pixmap->etna_bo;
 	op->src.pitch = op->src.pixmap->pitch;
 	op->src.format = op->src.pixmap->format;
+	op->src.width = pSrc->width;
+	op->src.height = pSrc->height;
+	op->src.rotate = DE_ROT_MODE_ROT0;
 
 	return TRUE;
 }
@@ -172,6 +175,9 @@ static Bool etnaviv_init_src_pixmap(struct etnaviv *etnaviv,
 	op->src.pitch = op->src.pixmap->pitch;
 	op->src.format = op->src.pixmap->format;
 	op->src.offset = ZERO_OFFSET;
+	op->src.width = pix->drawable.width;
+	op->src.height = pix->drawable.height;
+	op->src.rotate = DE_ROT_MODE_ROT0;
 
 	return TRUE;
 }
@@ -1028,6 +1034,9 @@ Bool etnaviv_accel_init(struct etnaviv *etnaviv)
 
 		/* reserve some additional batch space */
 		etnaviv->batch_de_high_watermark -= BATCH_WA_GC320_SIZE;
+
+		if (VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20))
+			etnaviv->batch_de_high_watermark -= 4;
 
 		etnaviv_enable_bugfix(etnaviv, BUGFIX_SINGLE_BITBLT_DRAW_OP);
 	}

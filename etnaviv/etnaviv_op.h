@@ -40,25 +40,34 @@ struct etnaviv_blit_buf {
 	struct etna_bo *bo;
 	unsigned pitch;
 	xPoint offset;
+	unsigned short width;
+	unsigned short height;
+	unsigned rotate;
 };
 
-#define INIT_BLIT_BUF(_fmt,_pix,_bo,_pitch,_off)	\
-	((struct etnaviv_blit_buf){			\
-		.format = _fmt,				\
-		.pixmap = _pix,				\
-		.bo = _bo,				\
-		.pitch = _pitch,			\
-		.offset	= _off,				\
+#define INIT_BLIT_BUF(_fmt,_pix,_bo,_pitch,_off,_w,_h,_r)	\
+	((struct etnaviv_blit_buf){				\
+		.format = _fmt,					\
+		.pixmap = _pix,					\
+		.bo = _bo,					\
+		.pitch = _pitch,				\
+		.offset	= _off,					\
+		.width = _w,					\
+		.height = _h,					\
+		.rotate = _r,				\
 	})
 
+#define INIT_BLIT_PIX_ROT(_pix, _fmt, _off, _rot) \
+	INIT_BLIT_BUF((_fmt), (_pix), (_pix)->etna_bo, (_pix)->pitch, (_off), \
+		      (_pix)->width, (_pix)->height, _rot)
 #define INIT_BLIT_PIX(_pix, _fmt, _off) \
-	INIT_BLIT_BUF((_fmt), (_pix), (_pix)->etna_bo, (_pix)->pitch, (_off))
+	INIT_BLIT_PIX_ROT(_pix, _fmt, _off, DE_ROT_MODE_ROT0)
 
 #define INIT_BLIT_BO(_bo, _pitch, _fmt, _off) \
-	INIT_BLIT_BUF((_fmt), NULL, (_bo), (_pitch), (_off))
+	INIT_BLIT_BUF((_fmt), NULL, (_bo), (_pitch), (_off), 0, 0, DE_ROT_MODE_ROT0)
 
 #define INIT_BLIT_NULL	\
-	INIT_BLIT_BUF({ }, NULL, NULL, 0, ZERO_OFFSET)
+	INIT_BLIT_BUF({ }, NULL, NULL, 0, ZERO_OFFSET, 0, 0, DE_ROT_MODE_ROT0)
 
 #define ZERO_OFFSET ((xPoint){ 0, 0 })
 

@@ -118,12 +118,16 @@ static void etnaviv_set_source_bo(struct etnaviv *etnaviv,
 {
 	uint32_t src_cfg = etnaviv_src_config(buf->format, src_origin_mode ==
 					       SRC_ORIGIN_RELATIVE);
+	uint32_t rot_cfg = buf->rotate == DE_ROT_MODE_ROT90 &&
+		!VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20) ?
+		VIVS_DE_SRC_ROTATION_CONFIG_ROTATION_ENABLE :
+		VIVS_DE_SRC_ROTATION_CONFIG_ROTATION_DISABLE;
 
 	EL_START(etnaviv, 6);
 	EL(LOADSTATE(VIVS_DE_SRC_ADDRESS, 5));
 	EL_RELOC(buf->bo, 0, FALSE);
 	EL(VIVS_DE_SRC_STRIDE_STRIDE(buf->pitch));
-	EL(VIVS_DE_SRC_ROTATION_CONFIG_ROTATION_DISABLE);
+	EL(VIVS_DE_SRC_ROTATION_CONFIG_WIDTH(buf->width) | rot_cfg);
 	EL(src_cfg);
 	EL(VIVS_DE_SRC_ORIGIN_X(buf->offset.x) |
 	   VIVS_DE_SRC_ORIGIN_Y(buf->offset.y));
@@ -216,6 +220,23 @@ static void etnaviv_set_blend(struct etnaviv *etnaviv,
 	EL_END();
 }
 
+static void etnaviv_emit_src_rotate(struct etnaviv *etnaviv,
+	const struct etnaviv_blit_buf *src)
+{
+	if (VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20)) {
+		EL_START(etnaviv, 4);
+		EL(LOADSTATE(VIVS_DE_SRC_ROTATION_HEIGHT, 2));
+		EL(VIVS_DE_SRC_ROTATION_HEIGHT_HEIGHT(src->height));
+		EL(VIVS_DE_ROT_ANGLE_SRC(src->rotate) |
+		   VIVS_DE_ROT_ANGLE_DST(DE_ROT_MODE_ROT0) |
+		   (~VIVS_DE_ROT_ANGLE_SRC_MASK &
+		    ~VIVS_DE_ROT_ANGLE_DST_MASK &
+		    ~VIVS_DE_ROT_ANGLE_SRC__MASK &
+		    ~VIVS_DE_ROT_ANGLE_DST__MASK));
+		EL_END();
+	}
+}
+
 static size_t etnaviv_size_2d_draw(struct etnaviv *etnaviv, size_t n)
 {
 	return 2 + 2 * n;
@@ -249,6 +270,7 @@ static void de_start(struct etnaviv *etnaviv, const struct etnaviv_de_op *op)
 		etnaviv_emit_brush(etnaviv, op->fg_colour);
 	etnaviv_emit_rop_clip(etnaviv, op->rop, op->rop, op->clip,
 			      op->dst.offset);
+	etnaviv_emit_src_rotate(etnaviv, &op->src);
 }
 
 void etnaviv_de_start(struct etnaviv *etnaviv, const struct etnaviv_de_op *op)
