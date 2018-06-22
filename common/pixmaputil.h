@@ -42,4 +42,11 @@ static inline Bool drawable_contains(DrawablePtr drawable,
 	return TRUE;
 }
 
+static inline Bool drawable_contains_box(DrawablePtr drawable, const BoxRec *box)
+{
+	return box->x1 >= 0 && box->y1 >= 0 &&
+	       box->x2 <= drawable->width &&
+	       box->y2 <= drawable->height;
+}
+
 #endif

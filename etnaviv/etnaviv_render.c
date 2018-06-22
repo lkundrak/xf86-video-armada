@@ -120,22 +120,31 @@ static void etnaviv_debug_blend_op(const char *func,
 }
 #endif
 
-static Bool picture_has_pixels(PicturePtr pPict, int x, int y,
+static Bool picture_has_pixels(PicturePtr pPict, xPoint origin,
 	const BoxRec *box)
 {
 	DrawablePtr pDrawable;
+	BoxRec b;
 
 	/* If there is no drawable, there are no pixels that can be fetched */
 	pDrawable = pPict->pDrawable;
 	if (!pDrawable)
 		return FALSE;
 
-	/* Does the drawable contain all the pixels we want? */
-	if (pPict->filter != PictFilterConvolution &&
-	    drawable_contains(pDrawable, x, y, box->x2, box->y2))
-		return TRUE;
+	if (pPict->filter == PictFilterConvolution)
+		return FALSE;
 
-	return FALSE;
+	b.x1 = origin.x;
+	b.y1 = origin.y;
+	b.x2 = origin.x + box->x2;
+	b.y2 = origin.y + box->y2;
+
+	/* transform to the source coordinates if required */
+	if (pPict->transform)
+		pixman_transform_bounds(pPict->transform, &b);
+
+	/* Does the drawable contain all the pixels we want? */
+	return drawable_contains_box(pDrawable, &b);
 }
 
 static const struct etnaviv_blend_op etnaviv_composite_op[] = {
@@ -408,18 +417,14 @@ static struct etnaviv_pixmap *etnaviv_acquire_src(ScreenPtr pScreen,
 	if (!vSrc)
 		goto fallback;
 
-	if (vSrc->width < clip->x2 || vSrc->height < clip->y2)
-		goto fallback;
-
 	etnaviv_set_format(vSrc, pict);
 	if (!etnaviv_src_format_valid(etnaviv, vSrc->pict_format))
 		goto fallback;
 
-	if (!transform_is_integer_translation(pict->transform, &tx, &ty))
+	if (!picture_has_pixels(pict, *src_topleft, clip))
 		goto fallback;
 
-	if (!picture_has_pixels(pict, src_topleft->x + tx, src_topleft->y + ty,
-				clip))
+	if (!transform_is_integer_translation(pict->transform, &tx, &ty))
 		goto fallback;
 
 	src_topleft->x += drawable->x + src_offset.x + tx;
@@ -647,19 +652,15 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 		xPoint mo;
 		int tx, ty;
 
+		/* We don't handle mask repeats (yet) */
+		if (!picture_has_pixels(pMask, mask_offset, &clip_temp))
+			goto fallback;
+
 		if (!transform_is_integer_translation(pMask->transform, &tx, &ty))
 			goto fallback;
 
-		mask_offset.x += tx;
-		mask_offset.y += ty;
-
-		/* We don't handle mask repeats (yet) */
-		if (!picture_has_pixels(pMask, mask_offset.x, mask_offset.y,
-					&clip_temp))
-			goto fallback;
-
-		mask_offset.x += pMask->pDrawable->x;
-		mask_offset.y += pMask->pDrawable->y;
+		mask_offset.x += pMask->pDrawable->x + tx;
+		mask_offset.y += pMask->pDrawable->y + ty;
 
 		/*
 		 * Check whether the mask has a etna bo backing it.  If not,

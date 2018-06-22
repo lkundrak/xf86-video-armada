@@ -242,7 +242,7 @@ AC_ARG_ENABLE(present, AC_HELP_STRING([--disable-present],
 		[PRESENT=no])
 
 # Checks for pkg-config packages
-PKG_CHECK_MODULES(XORG, [xorg-server >= 1.9.99.1 xproto fontsproto])
+PKG_CHECK_MODULES(XORG, [xorg-server >= 1.9.99.1 xproto fontsproto pixman-1])
 sdkdir=$(pkg-config --variable=sdkdir xorg-server)
 
 # Checks for required extensions
