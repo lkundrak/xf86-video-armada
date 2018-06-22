@@ -120,6 +120,66 @@ static void etnaviv_debug_blend_op(const char *func,
 }
 #endif
 
+struct transform_properties {
+	xPoint translation;
+	unsigned rot_mode;
+};
+
+static Bool picture_transform(PicturePtr pict, struct transform_properties *p)
+{
+	PictTransformPtr t = pict->transform;
+
+	if (t->matrix[2][0] != 0 ||
+	    t->matrix[2][1] != 0 ||
+	    t->matrix[2][2] != pixman_int_to_fixed(1))
+		return FALSE;
+
+	if (xFixedFrac(t->matrix[0][2]) != 0 ||
+	    xFixedFrac(t->matrix[1][2]) != 0)
+		return FALSE;
+
+	p->translation.x = pixman_fixed_to_int(t->matrix[0][2]);
+	p->translation.y = pixman_fixed_to_int(t->matrix[1][2]);
+
+	if (t->matrix[1][0] == 0 && t->matrix[0][1] == 0) {
+		if (t->matrix[0][0] == pixman_int_to_fixed(1) &&
+		    t->matrix[1][1] == pixman_int_to_fixed(1)) {
+			/* No rotation */
+			p->rot_mode = DE_ROT_MODE_ROT0;
+			return TRUE;
+		} else if (t->matrix[0][0] == pixman_int_to_fixed(-1) &&
+			   t->matrix[1][1] == pixman_int_to_fixed(-1) &&
+			   p->translation.x == pict->pDrawable->width &&
+			   p->translation.y == pict->pDrawable->height) {
+			/* 180° rotation */
+			p->rot_mode = DE_ROT_MODE_ROT180;
+			p->translation.x = 0;
+			p->translation.y = 0;
+			return TRUE;
+		}
+	} else if (t->matrix[0][0] == 0 && t->matrix[1][1] == 0) {
+		if (t->matrix[0][1] == pixman_int_to_fixed(-1) &&
+		    t->matrix[1][0] == pixman_int_to_fixed(1) &&
+		    p->translation.x == pict->pDrawable->width &&
+		    p->translation.y == 0) {
+			/* Rotate left (90° anti-clockwise) */
+			p->rot_mode = DE_ROT_MODE_ROT90;
+			p->translation.x = 0;
+			return TRUE;
+		} else if (t->matrix[0][1] == pixman_int_to_fixed(1) &&
+			   t->matrix[1][0] == pixman_int_to_fixed(-1) &&
+			   p->translation.x == 0 &&
+			   p->translation.y == pict->pDrawable->height) {
+			/* Rotate right (90° clockwise) */
+			p->rot_mode = DE_ROT_MODE_ROT270;
+			p->translation.y = 0;
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 static Bool picture_has_pixels(PicturePtr pPict, xPoint origin,
 	const BoxRec *box)
 {
@@ -388,7 +448,7 @@ static Bool etnaviv_workaround_nonalpha(struct etnaviv_format *fmt)
  */
 static struct etnaviv_pixmap *etnaviv_acquire_src(ScreenPtr pScreen,
 	PicturePtr pict, const BoxRec *clip, PixmapPtr *ppPixTemp,
-	xPoint *src_topleft, Bool force_vtemp)
+	xPoint *src_topleft, unsigned *rotation, Bool force_vtemp)
 {
 	struct etnaviv *etnaviv = etnaviv_get_screen_priv(pScreen);
 	struct etnaviv_pixmap *vSrc, *vTemp;
@@ -408,6 +468,10 @@ static struct etnaviv_pixmap *etnaviv_acquire_src(ScreenPtr pScreen,
 
 		src_topleft->x = 0;
 		src_topleft->y = 0;
+
+		if (rotation)
+			*rotation = DE_ROT_MODE_ROT0;
+
 		return vTemp;
 	}
 
@@ -427,12 +491,30 @@ static struct etnaviv_pixmap *etnaviv_acquire_src(ScreenPtr pScreen,
 		goto fallback;
 
 	if (pict->transform) {
+		struct transform_properties prop;
 		struct pixman_transform inv;
 		struct pixman_vector vec;
-		int tx, ty;
 
-		if (!transform_is_integer_translation(pict->transform, &tx, &ty))
+		if (!picture_transform(pict, &prop))
 			goto fallback;
+
+		if (rotation) {
+			switch (prop.rot_mode) {
+			case DE_ROT_MODE_ROT180: /* 180°, aka inverted */
+			case DE_ROT_MODE_ROT270: /* 90° clockwise, aka right */
+				if (!VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20))
+					goto fallback;
+				/* fallthrough */
+			case DE_ROT_MODE_ROT0: /* no rotation, aka normal */
+			case DE_ROT_MODE_ROT90: /* 90° anti-clockwise, aka left */
+				break;
+			default:
+				goto fallback;
+			}
+			*rotation = prop.rot_mode;
+		} else if (prop.rot_mode != DE_ROT_MODE_ROT0) {
+			goto fallback;
+		}
 
 		/* Map the drawable source offsets to destination coords.
 		 * The GPU calculates the source coordinate using:
@@ -443,8 +525,8 @@ static struct etnaviv_pixmap *etnaviv_acquire_src(ScreenPtr pScreen,
 		 * We need to do some fiddling here to calculate the source
 		 * origin values.
 		 */
-		vec.vector[0] = pixman_int_to_fixed(src_offset.x + tx);
-		vec.vector[1] = pixman_int_to_fixed(src_offset.y + ty);
+		vec.vector[0] = pixman_int_to_fixed(src_offset.x + prop.translation.x);
+		vec.vector[1] = pixman_int_to_fixed(src_offset.y + prop.translation.y);
 		vec.vector[2] = pixman_int_to_fixed(0);
 
 		pixman_transform_invert(&inv, pict->transform);
@@ -456,6 +538,9 @@ static struct etnaviv_pixmap *etnaviv_acquire_src(ScreenPtr pScreen,
 		/* No transform, simple case */
 		src_topleft->x += src_offset.x;
 		src_topleft->y += src_offset.y;
+
+		if (rotation)
+			*rotation = DE_ROT_MODE_ROT0;
 	}
 
 	if (force_vtemp)
@@ -476,6 +561,10 @@ fallback:
 
 	src_topleft->x = 0;
 	src_topleft->y = 0;
+
+	if (rotation)
+		*rotation = DE_ROT_MODE_ROT0;
+
 	return vTemp;
 
 copy_to_vtemp:
@@ -497,6 +586,10 @@ copy_to_vtemp:
 
 	src_topleft->x = 0;
 	src_topleft->y = 0;
+
+	if (rotation)
+		*rotation = DE_ROT_MODE_ROT0;
+
 	return vTemp;
 }
 
@@ -559,6 +652,7 @@ static int etnaviv_accel_composite_srconly(PicturePtr pSrc, PicturePtr pDst,
 	struct etnaviv_pixmap *vSrc;
 	BoxRec clip_temp;
 	xPoint src_topleft;
+	unsigned rotation;
 
 	if (pSrc->alphaMap)
 		return FALSE;
@@ -591,7 +685,7 @@ static int etnaviv_accel_composite_srconly(PicturePtr pSrc, PicturePtr pDst,
 	 * alpha channel is valid.
 	 */
 	vSrc = etnaviv_acquire_src(pScreen, pSrc, &clip_temp, &state->pPixTemp,
-				   &src_topleft, FALSE);
+				   &src_topleft, &rotation, FALSE);
 	if (!vSrc)
 		return FALSE;
 
@@ -614,7 +708,8 @@ static int etnaviv_accel_composite_srconly(PicturePtr pSrc, PicturePtr pDst,
 	    !etnaviv_map_gpu(etnaviv, vSrc, GPU_ACCESS_RO))
 		return FALSE;
 
-	state->final_op.src = INIT_BLIT_PIX(vSrc, vSrc->pict_format, src_topleft);
+	state->final_op.src = INIT_BLIT_PIX_ROT(vSrc, vSrc->pict_format,
+						src_topleft, rotation);
 
 	return TRUE;
 }
@@ -720,7 +815,7 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 	 * blend.
 	 */
 	vSrc = etnaviv_acquire_src(pScreen, pSrc, &clip_temp, &state->pPixTemp,
-				   &src_topleft, TRUE);
+				   &src_topleft, NULL, TRUE);
 	if (!vSrc)
 		goto fallback;
 
