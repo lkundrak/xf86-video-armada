@@ -396,7 +396,6 @@ static struct etnaviv_pixmap *etnaviv_acquire_src(ScreenPtr pScreen,
 	DrawablePtr drawable;
 	uint32_t colour;
 	xPoint src_offset;
-	int tx, ty;
 
 	if (etnaviv_pict_solid_argb(pict, &colour)) {
 		vTemp = etnaviv_get_scratch_argb(pScreen, ppPixTemp,
@@ -417,6 +416,9 @@ static struct etnaviv_pixmap *etnaviv_acquire_src(ScreenPtr pScreen,
 	if (!vSrc)
 		goto fallback;
 
+	src_offset.x += drawable->x;
+	src_offset.y += drawable->y;
+
 	etnaviv_set_format(vSrc, pict);
 	if (!etnaviv_src_format_valid(etnaviv, vSrc->pict_format))
 		goto fallback;
@@ -424,11 +426,38 @@ static struct etnaviv_pixmap *etnaviv_acquire_src(ScreenPtr pScreen,
 	if (!picture_has_pixels(pict, *src_topleft, clip))
 		goto fallback;
 
-	if (!transform_is_integer_translation(pict->transform, &tx, &ty))
-		goto fallback;
+	if (pict->transform) {
+		struct pixman_transform inv;
+		struct pixman_vector vec;
+		int tx, ty;
 
-	src_topleft->x += drawable->x + src_offset.x + tx;
-	src_topleft->y += drawable->y + src_offset.y + ty;
+		if (!transform_is_integer_translation(pict->transform, &tx, &ty))
+			goto fallback;
+
+		/* Map the drawable source offsets to destination coords.
+		 * The GPU calculates the source coordinate using:
+		 * source coord = rotation(destination coord + source origin)
+		 * where rotation() rotates around the center point of the
+		 * source.  Hence, for a 90° anti-clockwise:
+		 *  rotation(x, y) { return (source_width - y), x; }
+		 * We need to do some fiddling here to calculate the source
+		 * origin values.
+		 */
+		vec.vector[0] = pixman_int_to_fixed(src_offset.x + tx);
+		vec.vector[1] = pixman_int_to_fixed(src_offset.y + ty);
+		vec.vector[2] = pixman_int_to_fixed(0);
+
+		pixman_transform_invert(&inv, pict->transform);
+		pixman_transform_point(&inv, &vec);
+
+		src_topleft->x += pixman_fixed_to_int(vec.vector[0]);
+		src_topleft->y += pixman_fixed_to_int(vec.vector[1]);
+	} else {
+		/* No transform, simple case */
+		src_topleft->x += src_offset.x;
+		src_topleft->y += src_offset.y;
+	}
+
 	if (force_vtemp)
 		goto copy_to_vtemp;
 
