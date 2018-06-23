@@ -434,6 +434,91 @@ static Bool etnaviv_workaround_nonalpha(struct etnaviv_format *fmt)
 }
 
 /*
+ * Acquire a drawable picture.  origin refers to the location in untransformed
+ * space of the origin, which will be updated for the underlying pixmap origin.
+ * rotation, if non-NULL, will take the GPU rotation.  Returns NULL if GPU
+ * acceleration of this drawable is not possible.
+ */
+static struct etnaviv_pixmap *etnaviv_acquire_drawable_picture(
+	ScreenPtr pScreen, PicturePtr pict, const BoxRec *clip, xPoint *origin,
+	unsigned *rotation)
+{
+	struct etnaviv *etnaviv = etnaviv_get_screen_priv(pScreen);
+	DrawablePtr drawable = pict->pDrawable;
+	struct etnaviv_pixmap *vpix;
+	xPoint offset;
+
+	vpix = etnaviv_drawable_offset(drawable, &offset);
+	if (!vpix)
+		return NULL;
+
+	offset.x += drawable->x;
+	offset.y += drawable->y;
+
+	etnaviv_set_format(vpix, pict);
+	if (!etnaviv_src_format_valid(etnaviv, vpix->pict_format))
+		return NULL;
+
+	if (!picture_has_pixels(pict, *origin, clip))
+		return NULL;
+
+	if (pict->transform) {
+		struct transform_properties prop;
+		struct pixman_transform inv;
+		struct pixman_vector vec;
+
+		if (!picture_transform(pict, &prop))
+			return NULL;
+
+		if (rotation) {
+			switch (prop.rot_mode) {
+			case DE_ROT_MODE_ROT180: /* 180°, aka inverted */
+			case DE_ROT_MODE_ROT270: /* 90° clockwise, aka right */
+				if (!VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20))
+					return NULL;
+				/* fallthrough */
+			case DE_ROT_MODE_ROT0: /* no rotation, aka normal */
+			case DE_ROT_MODE_ROT90: /* 90° anti-clockwise, aka left */
+				break;
+			default:
+				return NULL;
+			}
+			*rotation = prop.rot_mode;
+		} else if (prop.rot_mode != DE_ROT_MODE_ROT0) {
+			return NULL;
+		}
+
+		/* Map the drawable source offsets to destination coords.
+		 * The GPU calculates the source coordinate using:
+		 * source coord = rotation(destination coord + source origin)
+		 * where rotation() rotates around the center point of the
+		 * source.  Hence, for a 90° anti-clockwise:
+		 *  rotation(x, y) { return (source_width - y), x; }
+		 * We need to do some fiddling here to calculate the source
+		 * origin values.
+		 */
+		vec.vector[0] = pixman_int_to_fixed(offset.x + prop.translation.x);
+		vec.vector[1] = pixman_int_to_fixed(offset.y + prop.translation.y);
+		vec.vector[2] = pixman_int_to_fixed(0);
+
+		pixman_transform_invert(&inv, pict->transform);
+		pixman_transform_point(&inv, &vec);
+
+		origin->x += pixman_fixed_to_int(vec.vector[0]);
+		origin->y += pixman_fixed_to_int(vec.vector[1]);
+	} else {
+		/* No transform, simple case */
+		origin->x += offset.x;
+		origin->y += offset.y;
+
+		if (rotation)
+			*rotation = DE_ROT_MODE_ROT0;
+	}
+
+	return vpix;
+}
+
+/*
  * Acquire the source. If we're filling a solid surface, force it to have
  * alpha; it may be used in combination with a mask.  Otherwise, we ask
  * for the plain source format, with or without alpha, and convert later
@@ -447,9 +532,7 @@ static struct etnaviv_pixmap *etnaviv_acquire_src(ScreenPtr pScreen,
 	struct etnaviv *etnaviv = etnaviv_get_screen_priv(pScreen);
 	struct etnaviv_pixmap *vSrc, *vTemp;
 	struct etnaviv_blend_op copy_op;
-	DrawablePtr drawable;
 	uint32_t colour;
-	xPoint src_offset;
 
 	if (etnaviv_pict_solid_argb(pict, &colour)) {
 		vTemp = etnaviv_get_scratch_argb(pScreen, ppPixTemp,
@@ -469,73 +552,10 @@ static struct etnaviv_pixmap *etnaviv_acquire_src(ScreenPtr pScreen,
 		return vTemp;
 	}
 
-	drawable = pict->pDrawable;
-	vSrc = etnaviv_drawable_offset(drawable, &src_offset);
+	vSrc = etnaviv_acquire_drawable_picture(pScreen, pict, clip,
+						src_topleft, rotation);
 	if (!vSrc)
 		goto fallback;
-
-	src_offset.x += drawable->x;
-	src_offset.y += drawable->y;
-
-	etnaviv_set_format(vSrc, pict);
-	if (!etnaviv_src_format_valid(etnaviv, vSrc->pict_format))
-		goto fallback;
-
-	if (!picture_has_pixels(pict, *src_topleft, clip))
-		goto fallback;
-
-	if (pict->transform) {
-		struct transform_properties prop;
-		struct pixman_transform inv;
-		struct pixman_vector vec;
-
-		if (!picture_transform(pict, &prop))
-			goto fallback;
-
-		if (rotation) {
-			switch (prop.rot_mode) {
-			case DE_ROT_MODE_ROT180: /* 180°, aka inverted */
-			case DE_ROT_MODE_ROT270: /* 90° clockwise, aka right */
-				if (!VIV_FEATURE(etnaviv->conn, chipMinorFeatures0, 2DPE20))
-					goto fallback;
-				/* fallthrough */
-			case DE_ROT_MODE_ROT0: /* no rotation, aka normal */
-			case DE_ROT_MODE_ROT90: /* 90° anti-clockwise, aka left */
-				break;
-			default:
-				goto fallback;
-			}
-			*rotation = prop.rot_mode;
-		} else if (prop.rot_mode != DE_ROT_MODE_ROT0) {
-			goto fallback;
-		}
-
-		/* Map the drawable source offsets to destination coords.
-		 * The GPU calculates the source coordinate using:
-		 * source coord = rotation(destination coord + source origin)
-		 * where rotation() rotates around the center point of the
-		 * source.  Hence, for a 90° anti-clockwise:
-		 *  rotation(x, y) { return (source_width - y), x; }
-		 * We need to do some fiddling here to calculate the source
-		 * origin values.
-		 */
-		vec.vector[0] = pixman_int_to_fixed(src_offset.x + prop.translation.x);
-		vec.vector[1] = pixman_int_to_fixed(src_offset.y + prop.translation.y);
-		vec.vector[2] = pixman_int_to_fixed(0);
-
-		pixman_transform_invert(&inv, pict->transform);
-		pixman_transform_point(&inv, &vec);
-
-		src_topleft->x += pixman_fixed_to_int(vec.vector[0]);
-		src_topleft->y += pixman_fixed_to_int(vec.vector[1]);
-	} else {
-		/* No transform, simple case */
-		src_topleft->x += src_offset.x;
-		src_topleft->y += src_offset.y;
-
-		if (rotation)
-			*rotation = DE_ROT_MODE_ROT0;
-	}
 
 	if (force_vtemp)
 		goto copy_to_vtemp;
@@ -766,40 +786,12 @@ static int etnaviv_accel_composite_masked(PicturePtr pSrc, PicturePtr pMask,
 		mask_op.dst_mode = DE_BLENDMODE_COLOR;
 	}
 
-	if (pMask->pDrawable) {
-		xPoint mo;
-		int tx, ty;
-
-		/* We don't handle mask repeats (yet) */
-		if (!picture_has_pixels(pMask, mask_offset, &clip_temp))
-			goto fallback;
-
-		if (!transform_is_integer_translation(pMask->transform, &tx, &ty))
-			goto fallback;
-
-		mask_offset.x += pMask->pDrawable->x + tx;
-		mask_offset.y += pMask->pDrawable->y + ty;
-
-		/*
-		 * Check whether the mask has a etna bo backing it.  If not,
-		 * fallback to software for the mask operation.
-		 */
-		vMask = etnaviv_drawable_offset(pMask->pDrawable, &mo);
-		if (!vMask)
-			goto fallback;
-
-		if (vMask->width < clip_temp.x2 || vMask->height < clip_temp.y2)
-			goto fallback;
-
-		mask_offset.x += mo.x;
-		mask_offset.y += mo.y;
-	} else {
+	if (!pMask->pDrawable)
 		goto fallback;
-	}
 
-	etnaviv_set_format(vMask, pMask);
-
-	if (!etnaviv_src_format_valid(etnaviv, vMask->pict_format))
+	vMask = etnaviv_acquire_drawable_picture(pScreen, pMask, &clip_temp,
+						 &mask_offset, NULL);
+	if (!vMask)
 		goto fallback;
 
 	/*
