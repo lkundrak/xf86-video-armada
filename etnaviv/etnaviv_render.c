@@ -148,31 +148,25 @@ static Bool picture_transform(PicturePtr pict, struct transform_properties *p)
 			p->rot_mode = DE_ROT_MODE_ROT0;
 			return TRUE;
 		} else if (t->matrix[0][0] == pixman_int_to_fixed(-1) &&
-			   t->matrix[1][1] == pixman_int_to_fixed(-1) &&
-			   p->translation.x == pict->pDrawable->width &&
-			   p->translation.y == pict->pDrawable->height) {
+			   t->matrix[1][1] == pixman_int_to_fixed(-1)) {
 			/* 180° rotation */
 			p->rot_mode = DE_ROT_MODE_ROT180;
-			p->translation.x = 0;
-			p->translation.y = 0;
+			p->translation.x -= pict->pDrawable->width;
+			p->translation.y -= pict->pDrawable->height;
 			return TRUE;
 		}
 	} else if (t->matrix[0][0] == 0 && t->matrix[1][1] == 0) {
 		if (t->matrix[0][1] == pixman_int_to_fixed(-1) &&
-		    t->matrix[1][0] == pixman_int_to_fixed(1) &&
-		    p->translation.x == pict->pDrawable->width &&
-		    p->translation.y == 0) {
+		    t->matrix[1][0] == pixman_int_to_fixed(1)) {
 			/* Rotate left (90° anti-clockwise) */
 			p->rot_mode = DE_ROT_MODE_ROT90;
-			p->translation.x = 0;
+			p->translation.x -= pict->pDrawable->width;
 			return TRUE;
 		} else if (t->matrix[0][1] == pixman_int_to_fixed(1) &&
-			   t->matrix[1][0] == pixman_int_to_fixed(-1) &&
-			   p->translation.x == 0 &&
-			   p->translation.y == pict->pDrawable->height) {
+			   t->matrix[1][0] == pixman_int_to_fixed(-1)) {
 			/* Rotate right (90° clockwise) */
 			p->rot_mode = DE_ROT_MODE_ROT270;
-			p->translation.y = 0;
+			p->translation.y -= pict->pDrawable->height;
 			return TRUE;
 		}
 	}
