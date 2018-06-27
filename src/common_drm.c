@@ -445,15 +445,48 @@ static const xf86OutputFuncsRec drm_output_funcs = {
 	.destroy = common_drm_conn_destroy,
 };
 
+/* Convert libdrm's connector type to Xorg name */
 static const char *const output_names[] = {
-	"None", "VGA", "DVI", "DVI", "DVI", "Composite", "TV",
-	"LVDS", "CTV", "DIN", "DP", "HDMI", "HDMI",
+	[DRM_MODE_CONNECTOR_Unknown]     = "None",
+	[DRM_MODE_CONNECTOR_VGA]         = "VGA",
+	[DRM_MODE_CONNECTOR_DVII]        = "DVI",
+	[DRM_MODE_CONNECTOR_DVID]        = "DVI",
+	[DRM_MODE_CONNECTOR_DVIA]        = "DVI",
+	[DRM_MODE_CONNECTOR_Composite]   = "Composite",
+	[DRM_MODE_CONNECTOR_SVIDEO]      = "TV",
+	[DRM_MODE_CONNECTOR_LVDS]        = "LVDS",
+	[DRM_MODE_CONNECTOR_Component]   = "CTV",
+	[DRM_MODE_CONNECTOR_9PinDIN]     = "DIN",
+	[DRM_MODE_CONNECTOR_DisplayPort] = "DP",
+	[DRM_MODE_CONNECTOR_HDMIA]       = "HDMI",
+	[DRM_MODE_CONNECTOR_HDMIB]       = "HDMI",
 };
 
+static const char *common_drm_output_name(uint32_t type)
+{
+	if (type >= ARRAY_SIZE(output_names))
+		type = DRM_MODE_CONNECTOR_Unknown;
+
+	return output_names[type];
+}
+
+/* Convert libdrm's subpixel order to Xorg subpixel */
 static const int subpixel_conv_table[] = {
-	0, SubPixelUnknown, SubPixelHorizontalRGB, SubPixelHorizontalBGR,
-	SubPixelVerticalRGB, SubPixelVerticalBGR, SubPixelNone
+	[DRM_MODE_SUBPIXEL_UNKNOWN]        = SubPixelUnknown,
+	[DRM_MODE_SUBPIXEL_HORIZONTAL_RGB] = SubPixelHorizontalRGB,
+	[DRM_MODE_SUBPIXEL_HORIZONTAL_BGR] = SubPixelHorizontalBGR,
+	[DRM_MODE_SUBPIXEL_VERTICAL_RGB]   = SubPixelVerticalRGB,
+	[DRM_MODE_SUBPIXEL_VERTICAL_BGR]   = SubPixelVerticalBGR,
+	[DRM_MODE_SUBPIXEL_NONE]           = SubPixelNone,
 };
+
+static int common_drm_subpixel(drmModeSubPixel k)
+{
+	if (k >= ARRAY_SIZE(subpixel_conv_table))
+		k = DRM_MODE_SUBPIXEL_UNKNOWN;
+
+	return subpixel_conv_table[k];
+}
 
 static void common_drm_conn_init(ScrnInfoPtr pScrn, uint32_t id)
 {
@@ -475,7 +508,7 @@ static void common_drm_conn_init(ScrnInfoPtr pScrn, uint32_t id)
 	}
 
 	snprintf(name, sizeof(name), "%s%d",
-		 output_names[koutput->connector_type],
+		 common_drm_output_name(koutput->connector_type),
 		 koutput->connector_type_id);
 
 	output = xf86OutputCreate(pScrn, &drm_output_funcs, name);
@@ -501,7 +534,7 @@ static void common_drm_conn_init(ScrnInfoPtr pScrn, uint32_t id)
 	output->driver_private = conn;
 	output->mm_width = koutput->mmWidth;
 	output->mm_height = koutput->mmHeight;
-	output->subpixel_order = subpixel_conv_table[koutput->subpixel];
+	output->subpixel_order = common_drm_subpixel(koutput->subpixel);
 	output->possible_crtcs = kencoder->possible_crtcs;
 	output->possible_clones = kencoder->possible_clones;
 	output->interlaceAllowed = 1; /* wish there was a way to read that */
