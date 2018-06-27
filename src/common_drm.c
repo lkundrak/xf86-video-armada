@@ -68,6 +68,7 @@ struct common_conn_info {
 	struct common_drm_property *props;
 	drmModeConnectorPtr mode_output;
 	drmModeEncoderPtr mode_encoder;
+	drmModePropertyPtr dpms;
 };
 
 static DevPrivateKeyRec pixmap_key;
@@ -287,13 +288,11 @@ static void common_drm_conn_create_resources(xf86OutputPtr output)
 static void common_drm_conn_dpms(xf86OutputPtr output, int mode)
 {
 	struct common_conn_info *conn = output->driver_private;
-	drmModePropertyPtr p = common_drm_conn_find_property(conn, "DPMS", NULL);
 
-	if (p) {
+	if (conn->dpms) {
 		drmModeConnectorSetProperty(conn->drm_fd, conn->drm_id,
-					    p->prop_id, mode);
+					    conn->dpms->prop_id, mode);
 		conn->dpms_mode = mode;
-		drmModeFreeProperty(p);
 	}
 }
 
@@ -423,6 +422,7 @@ static void common_drm_conn_destroy(xf86OutputPtr output)
 {
 	struct common_conn_info *conn = output->driver_private;
 
+	drmModeFreeProperty(conn->dpms);
 	drmModeFreeConnector(conn->mode_output);
 	drmModeFreeEncoder(conn->mode_encoder);
 	free(conn);
@@ -539,6 +539,9 @@ static void common_drm_conn_init(ScrnInfoPtr pScrn, uint32_t id)
 	output->possible_clones = kencoder->possible_clones;
 	output->interlaceAllowed = 1; /* wish there was a way to read that */
 	output->doubleScanAllowed = 0;
+
+	/* Lookup and save the DPMS property */
+	conn->dpms = common_drm_conn_find_property(conn, "DPMS", NULL);
 }
 
 /*
