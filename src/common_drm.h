@@ -15,8 +15,8 @@ struct common_drm_device {
 
 struct common_crtc_info {
 	int drm_fd;
+	uint32_t drm_id;
 	unsigned num;
-	drmModeCrtcPtr mode_crtc;
 	uint32_t primary_plane_id;
 	void *cursor_data;
 	uint32_t cursor_handle;

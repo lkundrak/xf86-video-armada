@@ -255,12 +255,9 @@ static void armada_drm_crtc_destroy(xf86CrtcPtr crtc)
 	struct common_crtc_info *drmc = common_crtc(crtc);
 
 	if (drmc->cursor_data) {
-		drmModeSetCursor(drmc->drm_fd, drmc->mode_crtc->crtc_id,
-				 0, 0, 0);
+		drmModeSetCursor(drmc->drm_fd, drmc->drm_id, 0, 0, 0);
 		drm_armada_bo_put(drmc->cursor_data);
 	}
-	drmModeFreeCrtc(drmc->mode_crtc);
-
 	free(drmc);
 }
 

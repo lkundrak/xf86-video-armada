@@ -630,12 +630,12 @@ static Bool common_drm_crtc_apply(xf86CrtcPtr crtc, uint32_t front_fb_id)
 
 	drmmode_ConvertToKMode(&kmode, &crtc->mode);
 
-	ret = drmModeSetCrtc(drmc->drm_fd, drmc->mode_crtc->crtc_id, fb_id,
+	ret = drmModeSetCrtc(drmc->drm_fd, drmc->drm_id, fb_id,
 			     x, y, output_ids, output_num, &kmode);
 	if (ret) {
 		xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
 			   "[drm] failed to set mode on crtc %u: %s\n",
-			   drmc->mode_crtc->crtc_id, strerror(errno));
+			   drmc->drm_id, strerror(errno));
 		ret = FALSE;
 	} else {
 		ret = TRUE;
@@ -723,7 +723,7 @@ void common_drm_crtc_gamma_set(xf86CrtcPtr crtc,
 {
 	struct common_crtc_info *drmc = common_crtc(crtc);
 
-	drmModeCrtcSetGamma(drmc->drm_fd, drmc->mode_crtc->crtc_id,
+	drmModeCrtcSetGamma(drmc->drm_fd, drmc->drm_id,
 			    size, red, green, blue);
 }
 
@@ -731,14 +731,14 @@ void common_drm_crtc_set_cursor_position(xf86CrtcPtr crtc, int x, int y)
 {
 	struct common_crtc_info *drmc = common_crtc(crtc);
 
-	drmModeMoveCursor(drmc->drm_fd, drmc->mode_crtc->crtc_id, x, y);
+	drmModeMoveCursor(drmc->drm_fd, drmc->drm_id, x, y);
 }
 
 void common_drm_crtc_show_cursor(xf86CrtcPtr crtc)
 {
 	struct common_drm_info *drm = GET_DRM_INFO(crtc->scrn);
 	struct common_crtc_info *drmc = common_crtc(crtc);
-	uint32_t crtc_id = drmc->mode_crtc->crtc_id;
+	uint32_t crtc_id = drmc->drm_id;
 	uint32_t handle = drmc->cursor_handle;
 	uint32_t width = drm->cursor_max_width;
 	uint32_t height = drm->cursor_max_height;
@@ -758,7 +758,7 @@ void common_drm_crtc_hide_cursor(xf86CrtcPtr crtc)
 {
 	struct common_crtc_info *drmc = common_crtc(crtc);
 
-	drmModeSetCursor(drmc->drm_fd, drmc->mode_crtc->crtc_id, 0, 0, 0);
+	drmModeSetCursor(drmc->drm_fd, drmc->drm_id, 0, 0, 0);
 }
 
 Bool common_drm_crtc_shadow_allocate(xf86CrtcPtr crtc, int width, int height,
@@ -808,8 +808,8 @@ static Bool common_drm_crtc_init(ScrnInfoPtr pScrn, unsigned num,
 
 	drmc = xnfcalloc(1, sizeof *drmc);
 	drmc->drm_fd = drm->fd;
+	drmc->drm_id = id;
 	drmc->num = num;
-	drmc->mode_crtc = drmModeGetCrtc(drmc->drm_fd, id);
 	crtc->driver_private = drmc;
 
 	/* Test whether hardware cursor is supported */
@@ -953,9 +953,8 @@ Bool common_drm_flip(ScrnInfoPtr pScrn, PixmapPtr pixmap,
 		event->handler = common_drm_flip_handler;
 
 		drmc = common_crtc(crtc);
-		if (drmModePageFlip(drm->fd, drmc->mode_crtc->crtc_id,
-				    drm->fb_id, DRM_MODE_PAGE_FLIP_EVENT,
-				    event)) {
+		if (drmModePageFlip(drm->fd, drmc->drm_id, drm->fb_id,
+				    DRM_MODE_PAGE_FLIP_EVENT, event)) {
 			xf86DrvMsg(pScrn->scrnIndex, X_WARNING,
 				   "page flip: queue failed: %s\n", strerror(errno));
 			free(event);
@@ -1440,7 +1439,7 @@ Bool common_drm_EnterVT(VT_FUNC_ARGS_DECL)
 		struct common_crtc_info *drmc = common_crtc(crtc);
 
 		if (!crtc->enabled)
-			drmModeSetCrtc(drmc->drm_fd, drmc->mode_crtc->crtc_id,
+			drmModeSetCrtc(drmc->drm_fd, drmc->drm_id,
 				       0, 0, 0, NULL, 0, NULL);
 	}
 

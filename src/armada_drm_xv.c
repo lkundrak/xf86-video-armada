@@ -801,7 +801,7 @@ static void armada_drm_primary_plane_restore(xf86CrtcPtr crtc)
 	int ret;
 
 	ret = drmModeSetPlane(drm->fd, drmc->primary_plane_id,
-			      drmc->mode_crtc->crtc_id, drm->fb_id, 0,
+			      drmc->drm_id, drm->fb_id, 0,
 			      crtc->x, crtc->y,
 			      crtc->mode.HDisplay, crtc->mode.VDisplay,
 			      0, 0,
@@ -945,7 +945,7 @@ armada_drm_plane_Put(ScrnInfoPtr pScrn, struct drm_xv *drmxv, uint32_t fb_id,
 	crtc_y = dst->y1 - crtc->y;
 
 	drmModeSetPlane(drmxv->fd, drmxv->overlay_plane->plane_id,
-			common_crtc(crtc)->mode_crtc->crtc_id, fb_id, 0,
+			common_crtc(crtc)->drm_id, fb_id, 0,
 			crtc_x, crtc_y, dst->x2 - dst->x1, dst->y2 - dst->y1,
 			x1, y1, x2 - x1, y2 - y1);
 
