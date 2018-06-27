@@ -373,7 +373,7 @@ static Bool common_drm_conn_set_property(xf86OutputPtr output, Atom property,
 		struct common_drm_property *prop = &conn->props[i];
 		drmModePropertyPtr dprop;
 
-		if (prop->atoms[0] != property)
+		if (!prop->atoms || prop->atoms[0] != property)
 			continue;
 
 		dprop = prop->mode_prop;
