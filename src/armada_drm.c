@@ -560,20 +560,6 @@ static Bool armada_drm_pre_init(ScrnInfoPtr pScrn)
 	return TRUE;
 }
 
-static int armada_get_cap(int fd, uint64_t cap, uint64_t *val, int scrnIndex,
-	const char *name)
-{
-	int err;
-
-	err = drmGetCap(fd, cap, val);
-	if (err)
-		xf86DrvMsg(scrnIndex, X_ERROR,
-			   "[drm] failed to get %s capability: %s\n",
-			   name, strerror(errno));
-
-	return err;
-}
-
 static Bool armada_drm_alloc(ScrnInfoPtr pScrn,
 	struct common_drm_device *drm_dev)
 {
@@ -591,8 +577,9 @@ static Bool armada_drm_alloc(ScrnInfoPtr pScrn,
 	drm->common.fd = drm_dev->fd;
 	drm->common.dev = drm_dev;
 
-	if (armada_get_cap(drm->common.fd, DRM_CAP_PRIME, &val,
-			   pScrn->scrnIndex, "DRM_CAP_PRIME"))
+	SET_DRM_INFO(pScrn, &drm->common);
+
+	if (common_drm_get_cap(pScrn, DRM_CAP_PRIME, &val))
 		goto err_free;
 	if (!(val & DRM_PRIME_CAP_EXPORT)) {
 		xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
@@ -600,8 +587,7 @@ static Bool armada_drm_alloc(ScrnInfoPtr pScrn,
 		goto err_free;
 	}
 
-	if (armada_get_cap(drm->common.fd, DRM_CAP_DUMB_BUFFER, &val,
-			   pScrn->scrnIndex, "DRM_CAP_DUMB_BUFFER"))
+	if (common_drm_get_cap(pScrn, DRM_CAP_DUMB_BUFFER, &val))
 		goto err_free;
 	if (!val) {
 		xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
@@ -616,8 +602,6 @@ static Bool armada_drm_alloc(ScrnInfoPtr pScrn,
 		goto err_free;
 	}
 
-	SET_DRM_INFO(pScrn, &drm->common);
-
 	drm->armada.version = drmGetVersion(drm->common.fd);
 	if (drm->armada.version)
 		xf86DrvMsg(pScrn->scrnIndex, X_INFO, "hardware: %s\n",
@@ -626,6 +610,7 @@ static Bool armada_drm_alloc(ScrnInfoPtr pScrn,
 	return TRUE;
 
  err_free:
+	SET_DRM_INFO(pScrn, NULL);
 	free(drm);
 	return FALSE;
 }

@@ -1089,6 +1089,21 @@ static Bool common_drm_CloseScreen(CLOSE_SCREEN_ARGS_DECL)
 	return ret;
 }
 
+int __common_drm_get_cap(ScrnInfoPtr pScrn, uint64_t cap, uint64_t *val,
+	const char *name)
+{
+	struct common_drm_info *drm = GET_DRM_INFO(pScrn);
+	int err;
+
+	err = drmGetCap(drm->fd, cap, val);
+	if (err)
+		xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
+			   "[drm] failed to get %s capability: %s\n",
+			   name, strerror(errno));
+
+	return err;
+}
+
 Bool common_drm_PreScreenInit(ScreenPtr pScreen)
 {
 	ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);

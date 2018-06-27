@@ -121,6 +121,10 @@ void common_drm_flip_pixmap(ScreenPtr pScreen, PixmapPtr a, PixmapPtr b);
 
 void common_drm_LoadPalette(ScrnInfoPtr pScrn, int num, int *indices,
 	LOCO *colors, VisualPtr pVisual);
+int __common_drm_get_cap(ScrnInfoPtr pScrn, uint64_t cap, uint64_t *val,
+        const char *name);
+#define common_drm_get_cap(pScrn, cap, val) \
+	__common_drm_get_cap(pScrn, cap, val, #cap)
 Bool common_drm_PreScreenInit(ScreenPtr pScreen);
 Bool common_drm_PostScreenInit(ScreenPtr pScreen);
 Bool common_drm_SwitchMode(SWITCH_MODE_ARGS_DECL);
