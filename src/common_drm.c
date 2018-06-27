@@ -1106,14 +1106,32 @@ int __common_drm_get_cap(ScrnInfoPtr pScrn, uint64_t cap, uint64_t *val,
 
 Bool common_drm_PreInit(ScrnInfoPtr pScrn, int flags24)
 {
+	struct common_drm_info *drm = GET_DRM_INFO(pScrn);
 	rgb defaultWeight = { 0, 0, 0 };
+	uint64_t val;
+	int depth, bpp;
 
 	pScrn->monitor = pScrn->confScreen->monitor;
 	pScrn->progClock = TRUE;
 	pScrn->rgbBits = 8;
 	pScrn->displayWidth = 640;
 
-	if (!xf86SetDepthBpp(pScrn, 0, 0, 0, flags24))
+	depth = bpp = 0;
+	if (drmGetCap(drm->fd, DRM_CAP_DUMB_PREFERRED_DEPTH, &val) == 0) {
+		switch (val) {
+		case 8:
+		case 15:
+		case 16:
+			bpp = (val + 7) & ~7;
+			depth = val;
+			break;
+		default:
+			depth = 24;
+			break;
+		}
+	}
+
+	if (!xf86SetDepthBpp(pScrn, depth, depth, bpp, flags24))
 		return FALSE;
 
 	xf86PrintDepthBpp(pScrn);
