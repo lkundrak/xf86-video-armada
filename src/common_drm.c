@@ -16,6 +16,7 @@
 #include <xf86drmMode.h>
 
 #include "xf86.h"
+#include "cursorstr.h"
 
 #include "boxutil.h"
 #include "pixmaputil.h"
@@ -691,10 +692,20 @@ void common_drm_crtc_show_cursor(xf86CrtcPtr crtc)
 {
 	struct common_drm_info *drm = GET_DRM_INFO(crtc->scrn);
 	struct common_crtc_info *drmc = common_crtc(crtc);
+	uint32_t crtc_id = drmc->mode_crtc->crtc_id;
+	uint32_t handle = drmc->cursor_handle;
+	uint32_t width = drm->cursor_max_width;
+	uint32_t height = drm->cursor_max_height;
 
-	drmModeSetCursor(drmc->drm_fd, drmc->mode_crtc->crtc_id,
-			 drmc->cursor_handle,
-			 drm->cursor_max_width, drm->cursor_max_height);
+	if (drmc->has_cursor2) {
+		xf86CrtcConfigPtr config = XF86_CRTC_CONFIG_PTR(crtc->scrn);
+		CursorBitsPtr cursor_bits = config->cursor->bits;
+
+		drmModeSetCursor2(drmc->drm_fd, crtc_id, handle, width, height,
+				  cursor_bits->xhot, cursor_bits->yhot);
+	} else {
+		drmModeSetCursor(drmc->drm_fd, crtc_id, handle, width, height);
+	}
 }
 
 void common_drm_crtc_hide_cursor(xf86CrtcPtr crtc)
@@ -758,6 +769,8 @@ static Bool common_drm_crtc_init(ScrnInfoPtr pScrn, unsigned num,
 	/* Test whether hardware cursor is supported */
 	if (drmModeSetCursor(drmc->drm_fd, id, 0, 0, 0))
 		drm->has_hw_cursor = FALSE;
+	else if (!drmModeSetCursor2(drmc->drm_fd, id, 0, 0, 0, 0, 0))
+		drmc->has_cursor2 = TRUE;
 
 	return TRUE;
 }

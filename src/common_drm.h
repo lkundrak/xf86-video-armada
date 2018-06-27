@@ -25,6 +25,7 @@ struct common_crtc_info {
 	uint64_t last_msc;
 	uint64_t swap_msc;
 	uint64_t swap_ust;
+	Bool has_cursor2;
 };
 #define common_crtc(crtc) \
 	((struct common_crtc_info *)(crtc)->driver_private)
