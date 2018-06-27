@@ -69,6 +69,7 @@ struct common_conn_info {
 	drmModeConnectorPtr mode_output;
 	drmModeEncoderPtr mode_encoder;
 	drmModePropertyPtr dpms;
+	drmModePropertyPtr edid;
 };
 
 static DevPrivateKeyRec pixmap_key;
@@ -154,28 +155,18 @@ static uint32_t common_drm_msc_to_frame(xf86CrtcPtr crtc, uint64_t msc)
 	return msc - drmc->last_msc;
 }
 
-static drmModePropertyPtr common_drm_conn_find_property(
-	struct common_conn_info *conn, const char *name, uint32_t *blob)
+static Bool mode_output_find_prop_value(drmModeConnectorPtr koutput,
+	uint32_t prop_id, uint64_t *value)
 {
-	drmModeConnectorPtr koutput = conn->mode_output;
 	int i;
 
 	for (i = 0; i < koutput->count_props; i++) {
-		drmModePropertyPtr p;
-
-		p = drmModeGetProperty(conn->drm_fd, koutput->props[i]);
-		if (!p || (blob && !(p->flags & DRM_MODE_PROP_BLOB)))
-			continue;
-
-		if (!strcmp(p->name, name)) {
-			if (blob)
-				*blob = koutput->prop_values[i];
-			return p;
+		if (koutput->props[i] == prop_id) {
+			*value = koutput->prop_values[i];
+			return TRUE;
 		}
-
-		drmModeFreeProperty(p);
 	}
-	return NULL;
+	return FALSE;
 }
 
 static void common_drm_conn_create_resources(xf86OutputPtr output)
@@ -334,16 +325,13 @@ static DisplayModePtr common_drm_conn_get_modes(xf86OutputPtr output)
 	struct common_conn_info *conn = output->driver_private;
 	drmModePropertyBlobPtr edid = NULL;
 	DisplayModePtr modes = NULL;
-	drmModePropertyPtr p;
 	xf86MonPtr mon;
-	uint32_t blob;
+	uint64_t blob;
 	int i;
 
-	p = common_drm_conn_find_property(conn, "EDID", &blob);
-	if (p) {
+	if (mode_output_find_prop_value(conn->mode_output,
+					conn->edid->prop_id, &blob))
 		edid = drmModeGetPropertyBlob(conn->drm_fd, blob);
-		drmModeFreeProperty(p);
-	}
 
 	mon = xf86InterpretEDID(pScrn->scrnIndex, edid ? edid->data : NULL);
 	if (mon && edid->length > 128)
@@ -422,6 +410,7 @@ static void common_drm_conn_destroy(xf86OutputPtr output)
 {
 	struct common_conn_info *conn = output->driver_private;
 
+	drmModeFreeProperty(conn->edid);
 	drmModeFreeProperty(conn->dpms);
 	drmModeFreeConnector(conn->mode_output);
 	drmModeFreeEncoder(conn->mode_encoder);
@@ -493,9 +482,11 @@ static void common_drm_conn_init(ScrnInfoPtr pScrn, uint32_t id)
 	struct common_drm_info *drm = GET_DRM_INFO(pScrn);
 	drmModeConnectorPtr koutput;
 	drmModeEncoderPtr kencoder;
+	drmModePropertyPtr prop;
 	xf86OutputPtr output;
 	struct common_conn_info *conn;
 	char name[32];
+	int i;
 
 	koutput = drmModeGetConnector(drm->fd, id);
 	if (!koutput)
@@ -540,8 +531,25 @@ static void common_drm_conn_init(ScrnInfoPtr pScrn, uint32_t id)
 	output->interlaceAllowed = 1; /* wish there was a way to read that */
 	output->doubleScanAllowed = 0;
 
-	/* Lookup and save the DPMS property */
-	conn->dpms = common_drm_conn_find_property(conn, "DPMS", NULL);
+	/* Lookup and save the DPMS and EDID properies */
+	for (i = 0; i < koutput->count_props; i++) {
+		prop = drmModeGetProperty(conn->drm_fd, koutput->props[i]);
+		if (!prop)
+			continue;
+
+		if (!strcmp(prop->name, "DPMS")) {
+			if (prop->flags & DRM_MODE_PROP_ENUM) {
+				conn->dpms = prop;
+				prop = NULL;
+			}
+		} else if (!strcmp(prop->name, "EDID")) {
+			if (prop->flags & DRM_MODE_PROP_BLOB) {
+				conn->edid = prop;
+				prop = NULL;
+			}
+		}
+		drmModeFreeProperty(prop);
+	}
 }
 
 /*
