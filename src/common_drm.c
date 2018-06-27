@@ -338,6 +338,8 @@ static DisplayModePtr common_drm_conn_get_modes(xf86OutputPtr output)
 		mon->flags |= MONITOR_EDID_COMPLETE_RAWDATA;
 	xf86OutputSetEDID(output, mon);
 
+	drmModeFreePropertyBlob(edid);
+
 	/* modes should already be available */
 	for (i = 0; i < conn->mode_output->count_modes; i++) {
 		DisplayModePtr mode = xnfalloc(sizeof *mode);
