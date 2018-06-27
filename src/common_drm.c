@@ -1104,6 +1104,29 @@ int __common_drm_get_cap(ScrnInfoPtr pScrn, uint64_t cap, uint64_t *val,
 	return err;
 }
 
+Bool common_drm_PreInit(ScrnInfoPtr pScrn, int flags24)
+{
+	rgb defaultWeight = { 0, 0, 0 };
+
+	pScrn->monitor = pScrn->confScreen->monitor;
+	pScrn->progClock = TRUE;
+	pScrn->rgbBits = 8;
+	pScrn->displayWidth = 640;
+
+	if (!xf86SetDepthBpp(pScrn, 0, 0, 0, flags24))
+		return FALSE;
+
+	xf86PrintDepthBpp(pScrn);
+
+	if (!xf86SetWeight(pScrn, defaultWeight, defaultWeight))
+		return FALSE;
+
+	if (!xf86SetDefaultVisual(pScrn, -1))
+		return FALSE;
+
+	return TRUE;
+}
+
 Bool common_drm_PreScreenInit(ScreenPtr pScreen)
 {
 	ScrnInfoPtr pScrn = xf86ScreenToScrn(pScreen);

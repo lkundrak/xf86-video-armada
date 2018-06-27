@@ -634,7 +634,6 @@ static void armada_drm_FreeScreen(FREE_SCREEN_ARGS_DECL)
 static Bool armada_drm_PreInit(ScrnInfoPtr pScrn, int flags)
 {
 	struct common_drm_device *drm_dev;
-	rgb defaultWeight = { 0, 0, 0 };
 	int flags24;
 
 	if (pScrn->numEntities != 1)
@@ -653,14 +652,10 @@ static Bool armada_drm_PreInit(ScrnInfoPtr pScrn, int flags)
 
 	/* Limit the maximum framebuffer size to 16MB */
 	pScrn->videoRam = 16 * 1048576;
-	pScrn->monitor = pScrn->confScreen->monitor;
-	pScrn->progClock = TRUE;
-	pScrn->rgbBits = 8;
 	pScrn->chipset = "fbdev";
-	pScrn->displayWidth = 640;
 
 	flags24 = Support24bppFb | Support32bppFb | SupportConvert24to32;
-	if (!xf86SetDepthBpp(pScrn, 0, 0, 0, flags24))
+	if (!common_drm_PreInit(pScrn, flags24))
 		goto fail;
 
 	switch (pScrn->depth) {
@@ -675,13 +670,6 @@ static Bool armada_drm_PreInit(ScrnInfoPtr pScrn, int flags)
 			   pScrn->depth);
 		goto fail;
 	}
-
-	xf86PrintDepthBpp(pScrn);
-
-	if (!xf86SetWeight(pScrn, defaultWeight, defaultWeight))
-		goto fail;
-	if (!xf86SetDefaultVisual(pScrn, -1))
-		goto fail;
 
 	if (pScrn->depth > 8 && pScrn->defaultVisual != TrueColor) {
 		xf86DrvMsg(pScrn->scrnIndex, X_ERROR,

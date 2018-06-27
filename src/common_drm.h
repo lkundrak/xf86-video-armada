@@ -125,6 +125,7 @@ int __common_drm_get_cap(ScrnInfoPtr pScrn, uint64_t cap, uint64_t *val,
         const char *name);
 #define common_drm_get_cap(pScrn, cap, val) \
 	__common_drm_get_cap(pScrn, cap, val, #cap)
+Bool common_drm_PreInit(ScrnInfoPtr pScrn, int flags24);
 Bool common_drm_PreScreenInit(ScreenPtr pScreen);
 Bool common_drm_PostScreenInit(ScreenPtr pScreen);
 Bool common_drm_SwitchMode(SWITCH_MODE_ARGS_DECL);
