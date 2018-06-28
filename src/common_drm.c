@@ -395,12 +395,23 @@ static Bool common_drm_conn_get_property(xf86OutputPtr output, Atom property)
 static void common_drm_conn_destroy(xf86OutputPtr output)
 {
 	struct common_conn_info *conn = output->driver_private;
+	int i;
 
-	drmModeFreeProperty(conn->edid);
-	drmModeFreeProperty(conn->dpms);
-	drmModeFreeConnector(conn->mode_output);
-	drmModeFreeEncoder(conn->mode_encoder);
-	free(conn);
+	if (conn) {
+		if (conn->props) {
+			for (i = 0; i < conn->nprops; i++) {
+				if (conn->props[i].atoms)
+					free(conn->props[i].atoms);
+				drmModeFreeProperty(conn->props[i].mode_prop);
+			}
+			free(conn->props);
+		}
+		drmModeFreeProperty(conn->edid);
+		drmModeFreeProperty(conn->dpms);
+		drmModeFreeConnector(conn->mode_output);
+		drmModeFreeEncoder(conn->mode_encoder);
+		free(conn);
+	}
 
 	output->driver_private = NULL;
 }
