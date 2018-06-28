@@ -336,51 +336,77 @@ static DisplayModePtr common_drm_conn_get_modes(xf86OutputPtr output)
 }
 
 #ifdef RANDR_12_INTERFACE
+static struct common_drm_property *common_drm_conn_find_prop(
+	struct common_conn_info *conn, Atom property)
+{
+	int i;
+
+	for (i = 0; i < conn->nprops; i++) {
+		struct common_drm_property *p = &conn->props[i];
+
+		if (p->atoms && p->atoms[0] == property)
+			return p;
+	}
+	return NULL;
+}
+
 static Bool common_drm_conn_set_property(xf86OutputPtr output, Atom property,
 	RRPropertyValuePtr value)
 {
 	struct common_conn_info *conn = output->driver_private;
-	int i;
+	struct common_drm_property *prop;
+	drmModePropertyPtr dprop;
+	uint64_t val;
 
-	for (i = 0; i < conn->nprops; i++) {
-		struct common_drm_property *prop = &conn->props[i];
-		drmModePropertyPtr dprop;
+	prop = common_drm_conn_find_prop(conn, property);
+	/* If we didn't recognise this property, just report success
+	 * in order to allow the set to continue, otherwise we break
+	 * setting of common properties like EDID.
+	 */
+	if (!prop)
+		return TRUE;
 
-		if (!prop->atoms || prop->atoms[0] != property)
-			continue;
-
-		dprop = prop->mode_prop;
-		if (dprop->flags & DRM_MODE_PROP_RANGE) {
-			if (value->type != XA_INTEGER || value->format != 32 || value->size != 1)
-				return FALSE;
-
-			drmModeConnectorSetProperty(conn->drm_fd, conn->drm_id,
-					dprop->prop_id, (uint64_t)*(uint32_t *)value->data);
-
-			return TRUE;
-		} else if (dprop->flags & DRM_MODE_PROP_ENUM) {
-			Atom atom;
-			const char *name;
-			int j;
-
-			if (value->type != XA_ATOM || value->format != 32 || value->size != 1)
-				return FALSE;
-
-			memcpy(&atom, value->data, sizeof(atom));
-			name = NameForAtom(atom);
-			if (name == NULL)
-				return FALSE;
-
-			for (j = 0; j < dprop->count_enums; j++) {
-				if (!strcmp(dprop->enums[j].name, name)) {
-					drmModeConnectorSetProperty(conn->drm_fd,
-						conn->drm_id, dprop->prop_id,
-						dprop->enums[j].value);
-					return TRUE;
-				}
-			}
+	dprop = prop->mode_prop;
+	if (dprop->flags & DRM_MODE_PROP_RANGE) {
+		if (value->type != XA_INTEGER ||
+		    value->format != 32 ||
+		    value->size != 1)
 			return FALSE;
+
+		val = *(uint32_t *)value->data;
+		drmModeConnectorSetProperty(conn->drm_fd, conn->drm_id,
+					    dprop->prop_id, val);
+
+		return TRUE;
+	} else if (dprop->flags & DRM_MODE_PROP_ENUM) {
+		Atom atom;
+		const char *name;
+		int j;
+
+		if (value->type != XA_ATOM ||
+		    value->format != 32 ||
+		    value->size != 1)
+			return FALSE;
+
+		memcpy(&atom, value->data, sizeof(atom));
+		name = NameForAtom(atom);
+		if (name == NULL)
+			return FALSE;
+
+		for (j = 0; j < dprop->count_enums; j++) {
+			if (!strcmp(dprop->enums[j].name, name)) {
+				val = dprop->enums[j].value;
+				break;
+			}
 		}
+
+		if (j >= dprop->count_enums)
+			return FALSE;
+
+		drmModeConnectorSetProperty(conn->drm_fd, conn->drm_id,
+					    dprop->prop_id, val);
+
+		return TRUE;
 	}
 	return TRUE;
 }
