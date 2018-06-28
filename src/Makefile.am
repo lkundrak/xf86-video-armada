@@ -31,6 +31,8 @@ armada_drv_la_SOURCES = armada_accel.h \
 			armada_ioctl.h \
 			common_drm.c \
 			common_drm.h \
+			common_drm_conn.c \
+			common_drm_conn.h \
 			common_drm_helper.h \
 			common_drm_plane.c
 if HAVE_DRI2
