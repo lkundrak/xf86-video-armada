@@ -55,7 +55,6 @@ const OptionInfoRec common_drm_options[] = {
 
 struct common_drm_property {
 	drmModePropertyPtr mode_prop;
-	uint64_t value;
 	int natoms;
 	Atom *atoms;
 };
@@ -172,49 +171,36 @@ static Bool mode_output_find_prop_value(drmModeConnectorPtr koutput,
 static void common_drm_conn_create_resources(xf86OutputPtr output)
 {
 	struct common_conn_info *conn = output->driver_private;
-	drmModeConnectorPtr mop = conn->mode_output;
-	int i, j, n, err;
+	int i, j, err;
 
-	conn->props = calloc(mop->count_props, sizeof *conn->props);
-	if (!conn->props)
-		return;
-
-	for (i = n = 0; i < mop->count_props; i++) {
-		struct common_drm_property *prop = &conn->props[n];
-		drmModePropertyPtr dprop;
+	for (i = 0; i < conn->nprops; i++) {
+		struct common_drm_property *p = &conn->props[i];
+		drmModePropertyPtr prop = p->mode_prop;
+		uint64_t value;
 		Bool immutable;
 
-		dprop = drmModeGetProperty(conn->drm_fd, mop->props[i]);
-		if (!dprop || dprop->flags & DRM_MODE_PROP_BLOB ||
-		    !strcmp(dprop->name, "DPMS") ||
-		    !strcmp(dprop->name, "EDID")) {
-			drmModeFreeProperty(dprop);
+		if (!mode_output_find_prop_value(conn->mode_output,
+						 prop->prop_id, &value))
 			continue;
-		}
 
-		n++;
-		prop->mode_prop = dprop;
-		prop->value = mop->prop_values[i];
+		immutable = !!(prop->flags & DRM_MODE_PROP_IMMUTABLE);
 
-		immutable = dprop->flags & DRM_MODE_PROP_IMMUTABLE ?
-				TRUE : FALSE;
-
-		if (dprop->flags & DRM_MODE_PROP_RANGE) {
+		if (prop->flags & DRM_MODE_PROP_RANGE) {
 			INT32 range[2];
-			uint32_t value = prop->value;
+			uint32_t val = value;
 
-			prop->natoms = 1;
-			prop->atoms = calloc(prop->natoms, sizeof *prop->atoms);
-			if (!prop->atoms)
+			p->natoms = 1;
+			p->atoms = calloc(p->natoms, sizeof *p->atoms);
+			if (!p->atoms)
 				continue;
 
-			range[0] = dprop->values[0];
-			range[1] = dprop->values[1];
+			range[0] = prop->values[0];
+			range[1] = prop->values[1];
 
-			prop->atoms[0] = MakeAtom(dprop->name,
-						  strlen(dprop->name), TRUE);
+			p->atoms[0] = MakeAtom(prop->name, strlen(prop->name),
+					       TRUE);
 			err = RRConfigureOutputProperty(output->randr_output,
-							prop->atoms[0], FALSE,
+							p->atoms[0], FALSE,
 							TRUE, immutable, 2,
 							range);
 			if (err)
@@ -223,49 +209,48 @@ static void common_drm_conn_create_resources(xf86OutputPtr output)
 					   err);
 
 			err = RRChangeOutputProperty(output->randr_output,
-						     prop->atoms[0],
+						     p->atoms[0],
 						     XA_INTEGER, 32,
 					             PropModeReplace, 1,
-						     &value, FALSE, TRUE);
+						     &val, FALSE, TRUE);
 			if (err)
 				xf86DrvMsg(output->scrn->scrnIndex, X_ERROR,
 					   "RRChangeOutputProperty error %d\n",
 					   err);
-		} else if (dprop->flags & DRM_MODE_PROP_ENUM) {
+		} else if (prop->flags & DRM_MODE_PROP_ENUM) {
 			int current;
 
-			prop->natoms = dprop->count_enums + 1;
-			prop->atoms = calloc(prop->natoms, sizeof *prop->atoms);
-			if (!prop->atoms)
+			p->natoms = prop->count_enums + 1;
+			p->atoms = calloc(p->natoms, sizeof *p->atoms);
+			if (!p->atoms)
 				continue;
 
-			current = prop->natoms;
-			prop->atoms[0] = MakeAtom(dprop->name,
-						  strlen(dprop->name), TRUE);
-			for (j = 1; j < prop->natoms; j++) {
+			current = p->natoms;
+			p->atoms[0] = MakeAtom(prop->name, strlen(prop->name),
+					       TRUE);
+			for (j = 1; j < p->natoms; j++) {
 				struct drm_mode_property_enum *e;
 
-				e = &dprop->enums[j - 1];
-				prop->atoms[j] = MakeAtom(e->name,
-							  strlen(e->name),
-							  TRUE);
-				if (prop->value == e->value)
+				e = &prop->enums[j - 1];
+				p->atoms[j] = MakeAtom(e->name, strlen(e->name),
+						       TRUE);
+				if (value == e->value)
 					current = j;
 			}
 
 			err = RRConfigureOutputProperty(output->randr_output,
-						 prop->atoms[0], FALSE, FALSE,
-						 immutable, prop->natoms - 1,
-						 (INT32 *)&prop->atoms[1]);
+						 p->atoms[0], FALSE, FALSE,
+						 immutable, p->natoms - 1,
+						 (INT32 *)&p->atoms[1]);
 			if (err)
 				xf86DrvMsg(output->scrn->scrnIndex, X_ERROR,
 					   "RRConfigureOutputProperty error, %d\n",
 					   err);
 
 			err = RRChangeOutputProperty(output->randr_output,
-						     prop->atoms[0], XA_ATOM,
+						     p->atoms[0], XA_ATOM,
 						     32, PropModeReplace, 1,
-						     &prop->atoms[current],
+						     &p->atoms[current],
 						     FALSE, TRUE);
 			if (err)
 				xf86DrvMsg(output->scrn->scrnIndex, X_ERROR,
@@ -273,7 +258,6 @@ static void common_drm_conn_create_resources(xf86OutputPtr output)
 					   err);
 		}
 	}
-	conn->nprops = n;
 }
 
 static void common_drm_conn_dpms(xf86OutputPtr output, int mode)
@@ -533,6 +517,12 @@ static void common_drm_conn_init(ScrnInfoPtr pScrn, uint32_t id)
 	output->interlaceAllowed = 1; /* wish there was a way to read that */
 	output->doubleScanAllowed = 0;
 
+	conn->props = calloc(koutput->count_props, sizeof *conn->props);
+	if (!conn->props) {
+		xf86OutputDestroy(output);
+		return;
+	}
+
 	/* Lookup and save the DPMS and EDID properies */
 	for (i = 0; i < koutput->count_props; i++) {
 		prop = drmModeGetProperty(conn->drm_fd, koutput->props[i]);
@@ -549,6 +539,11 @@ static void common_drm_conn_init(ScrnInfoPtr pScrn, uint32_t id)
 				conn->edid = prop;
 				prop = NULL;
 			}
+		} else if (prop->flags & (DRM_MODE_PROP_RANGE |
+					  DRM_MODE_PROP_ENUM)) {
+			conn->props[conn->nprops].mode_prop = prop;
+			conn->nprops++;
+			prop = NULL;
 		}
 		drmModeFreeProperty(prop);
 	}
