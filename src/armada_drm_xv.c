@@ -946,7 +946,8 @@ armada_drm_plane_Put(ScrnInfoPtr pScrn, struct drm_xv *drmxv, uint32_t fb_id,
 		Bool obscured;
 
 		box_init(&crtcbox, crtc->x, crtc->y,
-			 crtc->mode.HDisplay, crtc->mode.VDisplay);
+			 xf86ModeWidth(&crtc->mode, crtc->rotation),
+			 xf86ModeHeight(&crtc->mode, crtc->rotation));
 
 		obscured = RegionContainsRect(clipBoxes, &crtcbox) == rgnIN;
 
