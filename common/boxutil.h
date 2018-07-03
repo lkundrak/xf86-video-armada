@@ -6,6 +6,24 @@
 #include "miscstruct.h"
 #include "utils.h"
 
+static inline void box_init(BoxPtr out, int x, int y, int w, int h)
+{
+	out->x1 = x;
+	out->x2 = x + w;
+	out->y1 = y;
+	out->y2 = y + h;
+}
+
+static inline int box_width(const BoxRec *b)
+{
+	return b->x2 - b->x1;
+}
+
+static inline int box_height(const BoxRec *b)
+{
+	return b->y2 - b->y1;
+}
+
 static inline Bool __box_intersect(BoxPtr out, const BoxRec *a, const BoxRec *b)
 {
 	out->x1 = maxt(a->x1, b->x1);
