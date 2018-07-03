@@ -494,10 +494,7 @@ static gceSTATUS vivante_blit_srcdst(struct vivante *vivante,
 	op->src.offset.x = src_x - (dst_x + op->dst.offset.x);
 	op->src.offset.y = src_y - (dst_y + op->dst.offset.y);
 
-	box.x1 = dst_x;
-	box.y1 = dst_y;
-	box.x2 = dst_x + width;
-	box.y2 = dst_y + height;
+	box_init(&box, dst_x, dst_y, width, height);
 
 	err = vivante_blit_start(vivante, op);
 	if (err == gcvSTATUS_OK) {
@@ -880,17 +877,13 @@ Bool vivante_accel_PolyPoint(DrawablePtr pDrawable, GCPtr pGC, int mode,
 		for (i = 0; i < npt; i++) {
 			x += ppt[i].x;
 			y += ppt[i].y;
-			pBox[i].x1 = x + pDrawable->x;
-			pBox[i].y1 = y + pDrawable->y;
-			pBox[i].x2 = pBox[i].x1 + 1;
-			pBox[i].y2 = pBox[i].y1 + 1;
+			box_init(&pBox[i], x + pDrawable->x, y + pDrawable->y,
+				 1, 1);
 		}
 	} else {
 		for (i = 0; i < npt; i++) {
-			pBox[i].x1 = ppt[i].x + pDrawable->x;
-			pBox[i].y1 = ppt[i].y + pDrawable->y;
-			pBox[i].x2 = pBox[i].x1 + 1;
-			pBox[i].y2 = pBox[i].y1 + 1;
+			box_init(&pBox[i], ppt[i].x + pDrawable->x,
+				 ppt[i].y + pDrawable->y, 1, 1);
 		}
 	}
 
@@ -945,10 +938,8 @@ Bool vivante_accel_PolyFillRectSolid(DrawablePtr pDrawable, GCPtr pGC, int n,
 	while (n--) {
 		BoxRec full_rect;
 
-		full_rect.x1 = prect->x + pDrawable->x;
-		full_rect.y1 = prect->y + pDrawable->y;
-		full_rect.x2 = full_rect.x1 + prect->width;
-		full_rect.y2 = full_rect.y1 + prect->height;
+		box_init(&full_rect, prect->x + pDrawable->x,
+			 prect->y + pDrawable->y, prect->width, prect->height);
 
 		prect++;
 

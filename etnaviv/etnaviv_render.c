@@ -26,6 +26,7 @@
 #include "mipict.h"
 #include "fbpict.h"
 
+#include "boxutil.h"
 #include "glyph_assemble.h"
 #include "glyph_cache.h"
 #include "glyph_extents.h"
@@ -188,10 +189,7 @@ static Bool picture_has_pixels(PicturePtr pPict, xPoint origin,
 	if (pPict->filter == PictFilterConvolution)
 		return FALSE;
 
-	b.x1 = origin.x;
-	b.y1 = origin.y;
-	b.x2 = origin.x + box->x2;
-	b.y2 = origin.y + box->y2;
+	box_init(&b, origin.x, origin.y, box->x2, box->y2);
 
 	/* transform to the source coordinates if required */
 	if (pPict->transform)
@@ -1224,9 +1222,7 @@ static Bool etnaviv_accel_Glyphs(CARD8 final_op, PicturePtr pSrc,
 	vMask = etnaviv_get_pixmap_priv(pMaskPixmap);
 	/* Clear the mask to transparent */
 	fmt = etnaviv_set_format(vMask, pMask);
-	box.x1 = box.y1 = 0;
-	box.x2 = width;
-	box.y2 = height;
+	box_init(&box, 0, 0, width, height);
 	if (!etnaviv_fill_single(etnaviv, vMask, &box, 0))
 		goto destroy_picture;
 
@@ -1364,10 +1360,7 @@ static void etnaviv_accel_glyph_upload(ScreenPtr pScreen, PicturePtr pDst,
 				      src_offset);
 	}
 
-	box.x1 = x;
-	box.y1 = y;
-	box.x2 = x + width;
-	box.y2 = y + height;
+	box_init(&box, x, y, width, height);
 
 	fmt = etnaviv_set_format(vdst, pDst);
 

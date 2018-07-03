@@ -601,17 +601,14 @@ Bool etnaviv_accel_PolyPoint(DrawablePtr pDrawable, GCPtr pGC, int mode,
 		for (i = 0; i < npt; i++) {
 			x += ppt[i].x;
 			y += ppt[i].y;
-			pBox[i].x1 = x + pDrawable->x;
-			pBox[i].y1 = y + pDrawable->y;
-			pBox[i].x2 = pBox[i].x1 + 1;
-			pBox[i].y2 = pBox[i].y1 + 1;
+			box_init(&pBox[i], x + pDrawable->x, y + pDrawable->y,
+				 1, 1);
 		}
 	} else {
 		for (i = 0; i < npt; i++) {
-			pBox[i].x1 = ppt[i].x + pDrawable->x;
-			pBox[i].y1 = ppt[i].y + pDrawable->y;
-			pBox[i].x2 = pBox[i].x1 + 1;
-			pBox[i].y2 = pBox[i].y1 + 1;
+			box_init(&pBox[i],
+				 ppt[i].x + pDrawable->x,
+				 ppt[i].y + pDrawable->y, 1, 1);
 		}
 	}
 
@@ -834,10 +831,10 @@ Bool etnaviv_accel_PolyFillRectSolid(DrawablePtr pDrawable, GCPtr pGC, int n,
 
 		prefetch (prect + 8);
 
-		full_rect.x1 = prect->x + pDrawable->x;
-		full_rect.y1 = prect->y + pDrawable->y;
-		full_rect.x2 = full_rect.x1 + prect->width;
-		full_rect.y2 = full_rect.y1 + prect->height;
+		box_init(&full_rect,
+			 prect->x + pDrawable->x,
+			 prect->y + pDrawable->y,
+			 prect->width, prect->height);
 
 		prect++;
 
@@ -937,10 +934,7 @@ Bool etnaviv_accel_PolyFillRectTiled(DrawablePtr pDrawable, GCPtr pGC, int n,
 						w = width;
 					width -= w;
 
-					dst.x1 = dst_x;
-					dst.x2 = dst_x + w;
-					dst.y1 = dst_y;
-					dst.y2 = dst_y + h;
+					box_init(&dst, dst_x, dst_y, w, h);
 					etnaviv_de_op_src_origin(etnaviv, &op,
 								 tile_origin,
 								 &dst);

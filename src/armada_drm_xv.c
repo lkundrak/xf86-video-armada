@@ -25,6 +25,7 @@
 #include <X11/Xatom.h>
 
 #include "armada_ioctl.h"
+#include "boxutil.h"
 #include "fourcc.h"
 #include "xv_attribute.h"
 #include "xv_image_format.h"
@@ -452,15 +453,6 @@ armada_drm_get_fmt_info(const struct xv_image_format *fmt,
 	}
 
 	return ret;
-}
-
-static void
-armada_drm_coords_to_box(BoxPtr box, short x, short y, short w, short h)
-{
-	box->x1 = x;
-	box->y1 = y;
-	box->x2 = x + w;
-	box->y2 = y + h;
 }
 
 static void armada_drm_bufs_free(struct drm_xv *drmxv)
@@ -953,10 +945,8 @@ armada_drm_plane_Put(ScrnInfoPtr pScrn, struct drm_xv *drmxv, uint32_t fb_id,
 		BoxRec crtcbox;
 		Bool obscured;
 
-		crtcbox.x1 = crtc->x;
-		crtcbox.y1 = crtc->y;
-		crtcbox.x2 = crtc->x + crtc->mode.HDisplay;
-		crtcbox.y2 = crtc->y + crtc->mode.VDisplay;
+		box_init(&crtcbox, crtc->x, crtc->y,
+			 crtc->mode.HDisplay, crtc->mode.VDisplay);
 
 		obscured = RegionContainsRect(clipBoxes, &crtcbox) == rgnIN;
 
@@ -986,7 +976,7 @@ static int armada_drm_plane_PutImage(ScrnInfoPtr pScrn,
 	uint32_t fb_id;
 	int ret;
 
-	armada_drm_coords_to_box(&dst, drw_x, drw_y, drw_w, drw_h);
+	box_init(&dst, drw_x, drw_y, drw_w, drw_h);
 
 	ret = armada_drm_plane_fbid(pScrn, drmxv, image, buf, width, height,
 				    &fb_id);
@@ -1023,7 +1013,7 @@ static int armada_drm_plane_ReputImage(ScrnInfoPtr pScrn,
 	if (drmxv->plane_fb_id == 0)
 		return Success;
 
-	armada_drm_coords_to_box(&dst, drw_x, drw_y, drw_w, drw_h);
+	box_init(&dst, drw_x, drw_y, drw_w, drw_h);
 
 	ret = armada_drm_plane_Put(pScrn, drmxv, drmxv->plane_fb_id,
 				   src_x, src_y, src_w, src_h,

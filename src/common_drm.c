@@ -545,9 +545,8 @@ void common_drm_flip_pixmap(ScreenPtr pScreen, PixmapPtr front, PixmapPtr b)
 	*common_drm_pixmap(b) = front_c;
 
 	/* Mark the front pixmap as having changed */
-	region.extents.x1 = region.extents.y1 = 0;
-	region.extents.x2 = front->drawable.width;
-	region.extents.y2 = front->drawable.height;
+	box_init(&region.extents, 0, 0,
+		 front->drawable.width, front->drawable.height);
 	region.data = NULL;
 
 	DamageRegionAppend(&front->drawable, &region);
@@ -1037,15 +1036,14 @@ xf86CrtcPtr common_drm_covering_crtc(ScrnInfoPtr pScrn, BoxPtr box,
 
 	best_crtc = NULL;
 	best_coverage = 0;
-	box_ret->x1 = box_ret->x2 = box_ret->y1 = box_ret->y2 = 0;
+	box_init(box_ret, 0, 0, 0, 0);
 	for (c = 0; c < xf86_config->num_crtc; c++) {
 		crtc = xf86_config->crtc[c];
 		if (!crtc->enabled)
 			continue;
-		crtc_box.x1 = crtc->x;
-		crtc_box.x2 = crtc->x + xf86ModeWidth(&crtc->mode, crtc->rotation);
-		crtc_box.y1 = crtc->y;
-		crtc_box.y2 = crtc->y + xf86ModeHeight(&crtc->mode, crtc->rotation);
+		box_init(&crtc_box, crtc->x, crtc->y,
+		         xf86ModeWidth(&crtc->mode, crtc->rotation),
+			 xf86ModeHeight(&crtc->mode, crtc->rotation));
 		box_intersect(&cover_box, &crtc_box, box);
 		coverage = box_area(&cover_box);
 		if (coverage && crtc == desired) {
@@ -1067,10 +1065,7 @@ xf86CrtcPtr common_drm_drawable_covering_crtc(DrawablePtr pDraw)
 	xf86CrtcPtr crtc;
 	BoxRec box, crtcbox;
 
-	box.x1 = pDraw->x;
-	box.y1 = pDraw->y;
-	box.x2 = box.x1 + pDraw->width;
-	box.y2 = box.y1 + pDraw->height;
+	box_init(&box, pDraw->x, pDraw->y, pDraw->width, pDraw->height);
 
 	crtc = common_drm_covering_crtc(pScrn, &box, NULL, &crtcbox);
 

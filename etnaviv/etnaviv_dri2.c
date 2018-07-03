@@ -21,6 +21,7 @@
 #include <xf86drm.h>
 #include <armada_bufmgr.h>
 
+#include "boxutil.h"
 #include "compat-api.h"
 #include "common_drm.h"
 #include "common_drm_dri2.h"
@@ -126,10 +127,7 @@ static void etnaviv_dri2_blit(ClientPtr client, DrawablePtr draw,
 	RegionRec region;
 	BoxRec box;
 
-	box.x1 = 0;
-	box.y1 = 0;
-	box.x2 = draw->width;
-	box.y2 = draw->height;
+	box_init(&box, 0, 0, draw->width, draw->height);
 	RegionInit(&region, &box, 0);
 
 	etnaviv_dri2_CopyRegion(draw, &region, front, back);
