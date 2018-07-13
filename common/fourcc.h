@@ -1,7 +1,8 @@
 #ifndef COMMON_FOURCC_H
 #define COMMON_FOURCC_H
 
-#include <drm/drm_fourcc.h>
+/* pick up the libdrm fourcc.h. */
+#include <drm_fourcc.h>
 /* pick up on the Xorg fourcc.h. */
 #include <fourcc.h>
 
