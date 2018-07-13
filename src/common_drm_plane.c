@@ -16,6 +16,7 @@
 
 #include "xf86.h"
 
+#include "compat-drm.h"
 #include "common_drm.h"
 
 static drmModePropertyPtr plane_hash_property(struct common_drm_info *drm,
@@ -222,12 +223,9 @@ static Bool plane_parse_types(ScrnInfoPtr pScrn,
 static Bool plane_universal_planes(ScrnInfoPtr pScrn, Bool enable)
 {
 	struct common_drm_info *drm = GET_DRM_INFO(pScrn);
-	struct drm_set_client_cap cap = {
-		.capability = DRM_CLIENT_CAP_UNIVERSAL_PLANES,
-		.value = enable,
-	};
 
-	return drmIoctl(drm->fd, DRM_IOCTL_SET_CLIENT_CAP, &cap) == 0;
+	return drmSetClientCap(drm->fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES,
+			       enable) == 0;
 }
 
 drmModePropertyPtr common_drm_plane_get_property(ScrnInfoPtr pScrn,

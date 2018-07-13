@@ -1,0 +1,8 @@
+#ifndef COMPAT_DRM_H
+#define COMPAT_DRM_H
+
+#ifndef DRM_CLIENT_CAP_UNIVERSAL_PLANES
+#define DRM_CLIENT_CAP_UNIVERSAL_PLANES 2
+#endif
+
+#endif

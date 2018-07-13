@@ -251,7 +251,7 @@ XORG_DRIVER_CHECK_EXT(RENDER, renderproto)
 XORG_DRIVER_CHECK_EXT(XV, videoproto)
 
 # Obtain compilter/linker options for the driver dependencies
-PKG_CHECK_MODULES(DRM, [libdrm >= 2.4.38])
+PKG_CHECK_MODULES(DRM, [libdrm >= 2.4.47])
 PKG_CHECK_MODULES(DRMARMADA, [libdrm_armada >= 2.0.0])
 
 save_LDFLAGS="$LDFLAGS"
