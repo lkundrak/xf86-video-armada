@@ -864,7 +864,7 @@ static Bool armada_drm_check_plane(ScrnInfoPtr pScrn, struct drm_xv *drmxv,
 
 	if (!crtc) {
 		/* Not being displayed on a CRTC */
-		armada_drm_plane_StopVideo(pScrn, drmxv, TRUE);
+		armada_drm_plane_StopVideo(pScrn, drmxv, FALSE);
 		return FALSE;
 	}
 
