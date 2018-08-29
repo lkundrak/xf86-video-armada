@@ -27,12 +27,10 @@ static pointer etnadrm_setup(pointer module, pointer opts, int *errmaj,
 		return (pointer) 1;
 	}
 
-	if(errmaj){
+	if (errmaj)
 		*errmaj = LDR_MODSPECIFIC;
-	}
-	if(errmin){
+	if (errmin)
 		*errmin = 0;
-	}
 
 	return NULL;
 }
