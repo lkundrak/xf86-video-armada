@@ -295,7 +295,9 @@ PKG_CHECK_MODULES(PRESENT, [presentproto >= 1.0], , PRESENT=no)
 if test x$PRESENT != xno; then
    save_CFLAGS=$CFLAGS
    CFLAGS="$XORG_CFLAGS $PRESENT_CFLAGS"
-   AC_CHECK_HEADERS([present.h], PRESENT=yes, PRESENT=no, [#include <dixstruct.h>])
+   AC_CHECK_HEADERS([present.h], PRESENT=yes, PRESENT=no,
+	[#include <xorg-server.h>]
+	[#include <dixstruct.h>])
    CFLAGS=$save_CFLAGS
 fi
 AC_MSG_CHECKING([whether to include PRESENT support])
