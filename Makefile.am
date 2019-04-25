@@ -31,3 +31,7 @@ endif
 if HAVE_ACCEL_GALCORE
 SUBDIRS += vivante
 endif
+
+EXTRA_DIST = \
+	conf/xorg-sample.conf \
+	FAQ

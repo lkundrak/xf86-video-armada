@@ -24,9 +24,15 @@ vivante_gpu_la_LIBADD = $(DRMARMADA_LIBS) $(LIBGAL_LIBS) \
 			$(top_builddir)/common/libcommon.la
 vivante_gpu_ladir = @moduledir@/drivers
 vivante_gpu_la_SOURCES = \
-			vivante.c \
 			vivante_accel.c \
-			vivante_utils.c
+			vivante_accel.h \
+			vivante.c \
+			vivante_compat.h \
+			vivante_dri2.h \
+			vivante.h \
+			vivante_utils.c \
+			vivante_utils.h
+
 if HAVE_DRI2
 vivante_gpu_la_SOURCES += vivante_dri2.c
 vivante_gpu_la_LIBADD += $(DRI_LIBS)
