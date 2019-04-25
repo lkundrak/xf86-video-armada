@@ -132,9 +132,9 @@ AC_ARG_ENABLE(etnadrm,
 
 AC_ARG_ENABLE(etnaviv,
 	      AC_HELP_STRING([--enable-etnaviv],
-			     [Enable Etnaviv (GALcore kernel driver) acceleration support [[default=enable]]]),
+			     [Enable Etnaviv (GALcore kernel driver) acceleration support [[default=auto]]]),
 	      [ACCEL_ETNAVIV="$enableval"],
-	      [ACCEL_ETNAVIV=no])
+	      [ACCEL_ETNAVIV=auto])
 
 AC_ARG_WITH(etnaviv-source,
             AC_HELP_STRING([--with-etnaviv-source=PATH],
