@@ -128,7 +128,7 @@ AC_ARG_ENABLE(etnadrm,
 	      AC_HELP_STRING([--disable-etnadrm],
 			     [Disable Etnaviv (DRM kernel driver) acceleration support [[default=enabled]]]),
 	      [ACCEL_ETNADRM="$enableval"],
-	      [ACCEL_ETNADRM=auto])
+	      [ACCEL_ETNADRM=yes])
 
 AC_ARG_ENABLE(etnaviv,
 	      AC_HELP_STRING([--enable-etnaviv],
@@ -188,7 +188,6 @@ AS_IF([test x$ACCEL_ETNAVIV != xno || test x$ACCEL_ETNADRM != xno],
    saved_CFLAGS="$CFLAGS"
    LDFLAGS="$LDFLAGS $ETNAVIV_LIBS"
    CFLAGS="$CFLAGS $ETNAVIV_CFLAGS"
-   AS_IF([test x$ACCEL_ETNADRM = xauto], [ACCEL_ETNADRM=yes], [ACCEL_ETNADRM=no])
    AS_IF([test x$ACCEL_ETNAVIV != xno],
          [
       AC_CHECK_LIB([etnaviv], [viv_open],
